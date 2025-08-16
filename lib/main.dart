@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_analytics/observer.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:async';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const PaxAuditApp());
 }
 
@@ -19,10 +30,35 @@ class CAProvider extends ChangeNotifier {
   final List<CA> _cas = [];
   List<CA> get cas => List.unmodifiable(_cas);
 
+  CAProvider() {
+    _subscribe();
+  }
+
+  Future<void> _subscribe() async {
+    FirebaseFirestore.instance.collection('cas').snapshots().listen((snapshot) {
+      _cas
+        ..clear()
+        ..addAll(snapshot.docs.map((d) {
+          final data = d.data();
+          return CA(
+            id: d.id,
+            username: (data['username'] ?? '') as String,
+            password: (data['password'] ?? '') as String,
+          );
+        }));
+      notifyListeners();
+    });
+  }
+
   void addCA(String username, String password) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     _cas.add(CA(id: id, username: username, password: password));
     notifyListeners();
+    FirebaseFirestore.instance.collection('cas').doc(id).set({
+      'username': username,
+      'password': password,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
   void editCA(String id, String username, String password) {
@@ -30,11 +66,17 @@ class CAProvider extends ChangeNotifier {
     ca.username = username;
     ca.password = password;
     notifyListeners();
+    FirebaseFirestore.instance.collection('cas').doc(id).update({
+      'username': username,
+      'password': password,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   void deleteCA(String id) {
     _cas.removeWhere((c) => c.id == id);
     notifyListeners();
+    FirebaseFirestore.instance.collection('cas').doc(id).delete();
   }
 
   CA? getCAByCredentials(String username, String password) {
@@ -58,17 +100,46 @@ class CAProvider extends ChangeNotifier {
 class AuthProvider extends ChangeNotifier {
   String? _role; // 'admin' or 'ca'
   String? _caId; // If CA, store CA id
-  bool get isLoggedIn => _role != null;
+  String? _uid; // Firebase UID
+  bool get isLoggedIn => _uid != null;
   String? get role => _role;
   String? get caId => _caId;
+  String? get uid => _uid;
 
-  void login(String role, {String? caId}) {
-    _role = role;
-    _caId = caId;
+  Future<void> refreshFromCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _uid = null;
+      _role = null;
+      _caId = null;
+      notifyListeners();
+      return;
+    }
+    _uid = user.uid;
+    final snap = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final data = snap.data();
+    _role = data != null ? (data['role'] as String?) : null;
+    _caId = data != null ? (data['caId'] as String?) : null;
     notifyListeners();
   }
 
-  void logout() {
+  Future<void> signIn(String email, String password) async {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+    await refreshFromCurrentUser();
+  }
+
+  Future<void> signUpAdmin(String email, String password) async {
+    final creds = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
+    await FirebaseFirestore.instance.collection('users').doc(creds.user!.uid).set({
+      'role': 'admin',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await refreshFromCurrentUser();
+  }
+
+  Future<void> logout() async {
+    await FirebaseAuth.instance.signOut();
+    _uid = null;
     _role = null;
     _caId = null;
     notifyListeners();
@@ -81,6 +152,7 @@ class PaxAuditApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -91,10 +163,24 @@ class PaxAuditApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'PaxAudit',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        themeMode: ThemeMode.system,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Color(0xFF0B5CAD),
+            brightness: Brightness.light,
+          ),
           useMaterial3: true,
         ),
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Color(0xFF0B5CAD),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+        ),
+        navigatorObservers: [
+          FirebaseAnalyticsObserver(analytics: analytics),
+        ],
         initialRoute: '/',
         routes: {
           '/': (context) => const SplashScreen(),
@@ -118,23 +204,41 @@ class PaxAuditApp extends StatelessWidget {
 }
 
 // --- Splash Screen ---
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeFromAuth();
+    });
+  }
+
+  Future<void> _routeFromAuth() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+    await authProvider.refreshFromCurrentUser();
+    if (!mounted) return;
+    if (authProvider.role == 'admin') {
+      Navigator.pushReplacementNamed(context, '/admin_dashboard');
+    } else if (authProvider.role == 'ca') {
+      Navigator.pushReplacementNamed(context, '/ca_dashboard');
+    } else {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    Future.delayed(const Duration(seconds: 2), () {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
-      if (auth.isLoggedIn) {
-        if (auth.role == 'admin') {
-          Navigator.pushReplacementNamed(context, '/admin_dashboard');
-        } else {
-          Navigator.pushReplacementNamed(context, '/ca_dashboard');
-        }
-      } else {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    });
     return const Scaffold(
       body: Center(child: Text('PaxAudit', style: TextStyle(fontSize: 32))),
     );
@@ -151,14 +255,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _username = '';
+  String _email = '';
   String _password = '';
-  String _role = 'admin';
   String? _error;
+  String _selectedRole = 'ca'; // user-chosen expected role
 
   @override
   Widget build(BuildContext context) {
-    final caProvider = Provider.of<CAProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Padding(
@@ -169,18 +273,19 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               DropdownButtonFormField<String>(
-                value: _role,
+                value: _selectedRole,
                 items: const [
                   DropdownMenuItem(value: 'admin', child: Text('Admin')),
                   DropdownMenuItem(value: 'ca', child: Text('CA')),
                 ],
-                onChanged: (val) => setState(() => _role = val ?? 'admin'),
+                onChanged: (val) => setState(() => _selectedRole = val ?? 'ca'),
                 decoration: const InputDecoration(labelText: 'Role'),
               ),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Username'),
-                onChanged: (val) => _username = val,
-                validator: (val) => val == null || val.isEmpty ? 'Enter username' : null,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (val) => _email = val.trim(),
+                validator: (val) => val == null || val.isEmpty ? 'Enter email' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Password'),
@@ -195,31 +300,42 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    if (_role == 'admin') {
-                      Provider.of<AuthProvider>(context, listen: false).login('admin');
-                      Navigator.pushReplacementNamed(context, '/admin_dashboard');
-                    } else {
-                      final ca = caProvider.getCAByCredentials(_username, _password);
-                      if (ca != null) {
-                        Provider.of<AuthProvider>(context, listen: false).login('ca', caId: ca.id);
-                        Navigator.pushReplacementNamed(context, '/ca_dashboard');
-                      } else {
-    setState(() {
-                          _error = 'Invalid CA credentials';
-                        });
-                      }
+                onPressed: () async {
+                  if (!_formKey.currentState!.validate()) return;
+                  try {
+                    await authProvider.signIn(_email, _password);
+                    var role = authProvider.role;
+                    // If no role yet and user chose CA, provision a CA role doc automatically
+                    if (role == null && _selectedRole == 'ca' && authProvider.uid != null) {
+                      await FirebaseFirestore.instance.collection('users').doc(authProvider.uid!).set({
+                        'role': 'ca',
+                        'createdAt': FieldValue.serverTimestamp(),
+                      }, SetOptions(merge: true));
+                      await authProvider.refreshFromCurrentUser();
+                      role = authProvider.role;
                     }
+
+                    await FirebaseAnalytics.instance.logLogin(loginMethod: role ?? 'email_password');
+
+                    if (role == 'admin' && _selectedRole == 'admin') {
+                      if (!mounted) return; Navigator.pushReplacementNamed(context, '/admin_dashboard');
+                    } else if (role == 'ca' && _selectedRole == 'ca') {
+                      if (!mounted) return; Navigator.pushReplacementNamed(context, '/ca_dashboard');
+                    } else if (role == null) {
+                      setState(() { _error = 'No role assigned. Choose CA or contact admin.'; });
+                    } else {
+                      setState(() { _error = 'Selected role does not match your account role ($role).'; });
+                    }
+                  } catch (e) {
+                    setState(() { _error = e.toString(); });
                   }
                 },
                 child: const Text('Login'),
               ),
-              if (_role == 'admin')
-                TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/signup'),
-                  child: const Text('Sign up as Admin'),
-                ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/signup'),
+                child: const Text('Sign up as Admin'),
+              ),
             ],
           ),
         ),
@@ -238,7 +354,7 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _username = '';
+  String _email = '';
   String _password = '';
 
   @override
@@ -253,9 +369,10 @@ class _SignupScreenState extends State<SignupScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Username'),
-                onChanged: (val) => _username = val,
-                validator: (val) => val == null || val.isEmpty ? 'Enter username' : null,
+                decoration: const InputDecoration(labelText: 'Admin Email'),
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (val) => _email = val.trim(),
+                validator: (val) => val == null || val.isEmpty ? 'Enter email' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Password'),
@@ -265,10 +382,14 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    Provider.of<AuthProvider>(context, listen: false).login('admin');
-                    Navigator.pushReplacementNamed(context, '/admin_dashboard');
+                onPressed: () async {
+                  if (!_formKey.currentState!.validate()) return;
+                  try {
+                    await Provider.of<AuthProvider>(context, listen: false).signUpAdmin(_email, _password);
+                    await FirebaseAnalytics.instance.logSignUp(signUpMethod: 'email_password_admin');
+                    if (!mounted) return; Navigator.pushReplacementNamed(context, '/admin_dashboard');
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                   }
                 },
                 child: const Text('Sign Up'),
@@ -293,8 +414,8 @@ class AdminDashboard extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Provider.of<AuthProvider>(context, listen: false).logout();
+            onPressed: () async {
+              await Provider.of<AuthProvider>(context, listen: false).logout();
               Navigator.pushReplacementNamed(context, '/login');
             },
           ),
@@ -332,6 +453,13 @@ class AdminDashboard extends StatelessWidget {
           ListTile(
             title: const Text('Bank Statements'),
             onTap: () => Navigator.pushNamed(context, '/bank_statements'),
+          ),
+          ListTile(
+            title: const Text('Documents & Passbook'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DocumentsScreen()),
+            ),
           ),
         ],
       ),
@@ -576,6 +704,33 @@ class CategoryProvider extends ChangeNotifier {
   final List<Category> _categories = [];
   List<Category> get categories => List.unmodifiable(_categories);
 
+  CategoryProvider() {
+    FirebaseFirestore.instance
+        .collection('categories')
+        .orderBy('lastEditedAt', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _categories
+        ..clear()
+        ..addAll(snapshot.docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final List history = (data['history'] as List?) ?? [];
+          return Category(
+            id: d.id,
+            name: (data['name'] ?? '') as String,
+            lastEditedBy: (data['lastEditedBy'] ?? '') as String,
+            lastEditedAt: ((data['lastEditedAt'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+            history: history.map((h) => CategoryEditHistory(
+              editedBy: (h['editedBy'] ?? '') as String,
+              timestamp: ((h['timestamp'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+              name: (h['name'] ?? '') as String,
+            )).toList(),
+          );
+        }));
+      notifyListeners();
+    });
+  }
+
   void addCategory(String name, String editedBy) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     final now = DateTime.now();
@@ -588,6 +743,18 @@ class CategoryProvider extends ChangeNotifier {
     );
     _categories.add(category);
     notifyListeners();
+    FirebaseFirestore.instance.collection('categories').doc(id).set({
+      'name': name,
+      'lastEditedBy': editedBy,
+      'lastEditedAt': FieldValue.serverTimestamp(),
+      'history': [
+        {
+          'editedBy': editedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+          'name': name,
+        }
+      ],
+    });
   }
 
   void editCategory(String id, String newName, String editedBy) {
@@ -597,6 +764,24 @@ class CategoryProvider extends ChangeNotifier {
     cat.lastEditedAt = DateTime.now();
     cat.history.add(CategoryEditHistory(editedBy: editedBy, timestamp: cat.lastEditedAt, name: newName));
     notifyListeners();
+    FirebaseFirestore.instance.collection('categories').doc(id).update({
+      'name': newName,
+      'lastEditedBy': editedBy,
+      'lastEditedAt': FieldValue.serverTimestamp(),
+      'history': FieldValue.arrayUnion([
+        {
+          'editedBy': editedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+          'name': newName,
+        }
+      ]),
+    });
+  }
+
+  void deleteCategoryById(String id) {
+    _categories.removeWhere((c) => c.id == id);
+    notifyListeners();
+    FirebaseFirestore.instance.collection('categories').doc(id).delete();
   }
 }
 
@@ -621,8 +806,7 @@ class CategoryManagementScreen extends StatelessWidget {
                   trailing: IconButton(
                     icon: const Icon(Icons.delete),
                     onPressed: () {
-                      categoryProvider.categories.removeAt(index);
-                      categoryProvider.notifyListeners();
+                      categoryProvider.deleteCategoryById(cat.id);
                     },
                   ),
                 );
@@ -784,8 +968,8 @@ class CADashboard extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Provider.of<AuthProvider>(context, listen: false).logout();
+            onPressed: () async {
+              await Provider.of<AuthProvider>(context, listen: false).logout();
               Navigator.pushReplacementNamed(context, '/login');
             },
           ),
@@ -902,6 +1086,41 @@ class ExpenseProvider extends ChangeNotifier {
   final List<Expense> _expenses = [];
   List<Expense> get expenses => List.unmodifiable(_expenses);
 
+  ExpenseProvider() {
+    FirebaseFirestore.instance
+        .collection('expenses')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _expenses
+        ..clear()
+        ..addAll(snapshot.docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final List history = (data['history'] as List?) ?? [];
+          return Expense(
+            id: d.id,
+            categoryId: (data['categoryId'] ?? '') as String,
+            amount: (data['amount'] ?? 0).toDouble(),
+            cgst: (data['cgst'] ?? 0).toDouble(),
+            sgst: (data['sgst'] ?? 0).toDouble(),
+            invoiceNumber: (data['invoiceNumber'] ?? '') as String,
+            date: ((data['date'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+            addedBy: (data['addedBy'] ?? '') as String,
+            bankAccount: (data['bankAccount'] ?? 'Cash') as String,
+            history: history.map((h) => ExpenseEditHistory(
+              amount: (h['amount'] ?? 0).toDouble(),
+              cgst: (h['cgst'] ?? 0).toDouble(),
+              sgst: (h['sgst'] ?? 0).toDouble(),
+              invoiceNumber: (h['invoiceNumber'] ?? '') as String,
+              editedBy: (h['editedBy'] ?? '') as String,
+              timestamp: ((h['timestamp'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+            )).toList(),
+          );
+        }));
+      notifyListeners();
+    });
+  }
+
   void addExpense({
     required String categoryId,
     required double amount,
@@ -935,6 +1154,26 @@ class ExpenseProvider extends ChangeNotifier {
     );
     _expenses.add(expense);
     notifyListeners();
+    FirebaseFirestore.instance.collection('expenses').doc(id).set({
+      'categoryId': categoryId,
+      'amount': amount,
+      'cgst': cgst,
+      'sgst': sgst,
+      'invoiceNumber': invoiceNumber,
+      'date': Timestamp.fromDate(date),
+      'addedBy': addedBy,
+      'bankAccount': bankAccount,
+      'history': [
+        {
+          'amount': amount,
+          'cgst': cgst,
+          'sgst': sgst,
+          'invoiceNumber': invoiceNumber,
+          'editedBy': addedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      ],
+    });
   }
 
   void editExpense(String id, double amount, double cgst, double sgst, String invoiceNumber, String editedBy, String bankAccount) {
@@ -953,11 +1192,29 @@ class ExpenseProvider extends ChangeNotifier {
       timestamp: DateTime.now(),
     ));
     notifyListeners();
+    FirebaseFirestore.instance.collection('expenses').doc(id).update({
+      'amount': amount,
+      'cgst': cgst,
+      'sgst': sgst,
+      'invoiceNumber': invoiceNumber,
+      'bankAccount': bankAccount,
+      'history': FieldValue.arrayUnion([
+        {
+          'amount': amount,
+          'cgst': cgst,
+          'sgst': sgst,
+          'invoiceNumber': invoiceNumber,
+          'editedBy': editedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      ]),
+    });
   }
 
   void deleteExpense(String id) {
     _expenses.removeWhere((e) => e.id == id);
     notifyListeners();
+    FirebaseFirestore.instance.collection('expenses').doc(id).delete();
   }
 
   double get totalGst => _expenses.fold(0, (sum, e) => sum + e.totalGst);
@@ -968,6 +1225,33 @@ class ExpenseProvider extends ChangeNotifier {
 class IncomeProvider extends ChangeNotifier {
   final List<Income> _incomes = [];
   List<Income> get incomes => List.unmodifiable(_incomes);
+
+  IncomeProvider() {
+    FirebaseFirestore.instance
+        .collection('incomes')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _incomes
+        ..clear()
+        ..addAll(snapshot.docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final List history = (data['history'] as List?) ?? [];
+          return Income(
+            id: d.id,
+            amount: (data['amount'] ?? 0).toDouble(),
+            date: ((data['date'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+            addedBy: (data['addedBy'] ?? '') as String,
+            history: history.map((h) => IncomeEditHistory(
+              amount: (h['amount'] ?? 0).toDouble(),
+              editedBy: (h['editedBy'] ?? '') as String,
+              timestamp: ((h['timestamp'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+            )).toList(),
+          );
+        }));
+      notifyListeners();
+    });
+  }
 
   void addIncome({
     required double amount,
@@ -989,6 +1273,18 @@ class IncomeProvider extends ChangeNotifier {
     );
     _incomes.add(income);
     notifyListeners();
+    FirebaseFirestore.instance.collection('incomes').doc(id).set({
+      'amount': amount,
+      'date': Timestamp.fromDate(date),
+      'addedBy': addedBy,
+      'history': [
+        {
+          'amount': amount,
+          'editedBy': addedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      ],
+    });
   }
 
   void editIncome(String id, double amount, String editedBy) {
@@ -1000,11 +1296,22 @@ class IncomeProvider extends ChangeNotifier {
       timestamp: DateTime.now(),
     ));
     notifyListeners();
+    FirebaseFirestore.instance.collection('incomes').doc(id).update({
+      'amount': amount,
+      'history': FieldValue.arrayUnion([
+        {
+          'amount': amount,
+          'editedBy': editedBy,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      ]),
+    });
   }
 
   void deleteIncome(String id) {
     _incomes.removeWhere((i) => i.id == id);
     notifyListeners();
+    FirebaseFirestore.instance.collection('incomes').doc(id).delete();
   }
 
   double get totalIncome => _incomes.fold(0, (sum, i) => sum + i.amount);
@@ -1914,6 +2221,131 @@ class CommentModalScreen extends StatelessWidget {
   const CommentModalScreen({super.key});
   @override
   Widget build(BuildContext context) => const _PlaceholderScreen('Comment Modal');
+}
+
+// --- Documents (Passbook & Uploads) ---
+class DocumentsScreen extends StatefulWidget {
+  const DocumentsScreen({super.key});
+  @override
+  State<DocumentsScreen> createState() => _DocumentsScreenState();
+}
+
+class _DocumentsScreenState extends State<DocumentsScreen> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload({required String category}) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(withData: true);
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+
+      setState(() => _uploading = true);
+
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      final fileName = file.name;
+      final storagePath = 'documents/$uid/$category/$fileName';
+      final ref = FirebaseStorage.instance.ref(storagePath);
+      final metadata = SettableMetadata(contentType: file.extension == 'pdf' ? 'application/pdf' : null);
+      if (file.bytes == null) throw Exception('No file bytes available');
+      await ref.putData(file.bytes!, metadata);
+      final downloadUrl = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('documents').add({
+        'uid': uid,
+        'category': category,
+        'name': fileName,
+        'path': storagePath,
+        'url': downloadUrl,
+        'uploadedAt': FieldValue.serverTimestamp(),
+      });
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Documents & Passbook')),
+      floatingActionButton: _uploading
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'upload_passbook',
+                  onPressed: () => _pickAndUpload(category: 'passbook'),
+                  icon: const Icon(Icons.book),
+                  label: const Text('Upload Passbook'),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'upload_doc',
+                  onPressed: () => _pickAndUpload(category: 'other'),
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload Document'),
+                ),
+              ],
+            ),
+      body: uid == null
+          ? const Center(child: Text('Login required'))
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_uploading)
+                  const LinearProgressIndicator(minHeight: 3),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('documents')
+                        .where('uid', isEqualTo: uid)
+                        .orderBy('uploadedAt', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final docs = snapshot.data?.docs ?? [];
+                      if (docs.isEmpty) {
+                        return const Center(child: Text('No documents uploaded yet.'));
+                      }
+                      return ListView.separated(
+                        itemCount: docs.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final d = docs[index].data();
+                          return ListTile(
+                            leading: Icon(d['category'] == 'passbook' ? Icons.book : Icons.insert_drive_file),
+                            title: Text(d['name'] ?? 'Unnamed'),
+                            subtitle: Text('${d['category']} • ${d['path']}'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () async {
+                                final path = d['path'] as String?;
+                                if (path != null) {
+                                  await FirebaseStorage.instance.ref(path).delete().catchError((_) {});
+                                }
+                                await docs[index].reference.delete();
+                              },
+                            ),
+                            onTap: () => _openUrl(d['url'] as String?),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  void _openUrl(String? url) {
+    if (url == null) return;
+    // Flutter web can open by using `dart:html`, but to keep cross-platform simple we just show a snackbar with URL.
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('URL: $url')));
+  }
 }
 
 class _PlaceholderScreen extends StatelessWidget {
