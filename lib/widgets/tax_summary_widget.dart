@@ -18,10 +18,19 @@ class TaxSummaryWidget extends StatelessWidget {
     final isLoss = totalExpense > totalIncome;
     final profitOrLoss = totalIncome - totalExpense; // negative => loss
 
-    final totalIncomeTax = _calculateIncomeTax(totalIncome);
-    final payableTaxValue = (totalIncomeTax - totalGstPaid);
+    // Compute income tax on profit only (not on gross income)
+    final taxableBase = profitOrLoss > 0 ? profitOrLoss : 0.0;
+    final totalIncomeTax = _calculateIncomeTax(taxableBase);
+    // GST paid on expenses is an input credit; do not subtract from income tax directly
+    final payableTaxValue = totalIncomeTax;
     final payableTaxClamped = payableTaxValue.clamp(0, double.infinity);
     final taxCategory = _getTaxCategory(totalIncome);
+
+    // GST summary: assume a flat output GST rate for income (e.g., services @ 18%)
+    const double outputGstRatePercent = 18.0;
+    final double outputGstOnIncome = (totalIncome * outputGstRatePercent) / 100.0;
+    final double inputGstOnExpenses = totalGstPaid;
+    final double payableGst = (outputGstOnIncome - inputGstOnExpenses).clamp(0, double.infinity);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -39,14 +48,21 @@ class TaxSummaryWidget extends StatelessWidget {
                 ? 'Profit: ₹${profitOrLoss.toStringAsFixed(2)}'
                 : 'Loss: ₹${(-profitOrLoss).toStringAsFixed(2)}',
           ),
-          Text(
-            'Total Income Tax (slab): ₹${totalIncomeTax.toStringAsFixed(2)}',
+          const SizedBox(height: 8),
+          const Text(
+            'GST Summary',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          Text(
-            isLoss
-                ? 'Total Expense GST Paid: -₹${totalGstPaid.toStringAsFixed(2)}'
-                : 'Total Expense GST Paid: ₹${totalGstPaid.toStringAsFixed(2)}',
+          Text('Income GST (${outputGstRatePercent.toStringAsFixed(0)}% of income): ₹${outputGstOnIncome.toStringAsFixed(2)}'),
+          Text('Expense GST (input credit): ₹${inputGstOnExpenses.toStringAsFixed(2)}'),
+          Text('Payable GST: ₹${payableGst.toStringAsFixed(2)}'),
+          const SizedBox(height: 8),
+          const Text(
+            'Income Tax Summary',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
+          Text('Taxable Profit: ₹${taxableBase.toStringAsFixed(2)}'),
+          Text('Income Tax (slab on profit): ₹${totalIncomeTax.toStringAsFixed(2)}'),
           if (isLoss)
             Container(
               margin: const EdgeInsets.only(top: 8),
@@ -81,8 +97,8 @@ class TaxSummaryWidget extends StatelessWidget {
             ),
           Text(
             isLoss
-                ? 'Payable Tax: N/A (in loss)'
-                : 'Payable Tax: ₹${payableTaxClamped.toStringAsFixed(2)}',
+                ? 'Payable Income Tax: N/A (in loss)'
+                : 'Payable Income Tax: ₹${payableTaxClamped.toStringAsFixed(2)}',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Text('Income Tax Slab: $taxCategory'),

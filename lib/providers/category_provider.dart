@@ -45,10 +45,17 @@ class CategoryProvider extends ChangeNotifier {
       notifyListeners();
 
       final docRef = await _firestore.collection('categories').add(category.toFirestore());
-      
+
       // Add to local list with the generated ID
-      final createdCategory = category.copyWith();
-      _categories.add(createdCategory);
+      _categories.add(Category(
+        id: docRef.id,
+        name: category.name,
+        gstPercentage: category.gstPercentage,
+        lastEditedBy: category.lastEditedBy,
+        lastEditedAt: category.lastEditedAt,
+        history: category.history,
+        companyId: category.companyId,
+      ));
 
       _isLoading = false;
       notifyListeners();

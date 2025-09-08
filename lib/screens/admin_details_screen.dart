@@ -5,6 +5,7 @@ import '../providers/company_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/ca_provider.dart';
+import '../providers/category_provider.dart';
 import '../models/company.dart';
 
 class AdminDetailsScreen extends StatefulWidget {
@@ -31,6 +32,8 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
           .loadExpensesForCompany(company.id);
       await Provider.of<IncomeProvider>(context, listen: false)
           .loadIncomesForCompany(company.id);
+      await Provider.of<CategoryProvider>(context, listen: false)
+          .loadCategoriesForCompany(company.id);
       await Provider.of<CAProvider>(context, listen: false)
           .loadCAsForCompany(company.id);
     }

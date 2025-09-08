@@ -49,10 +49,19 @@ class IncomeProvider extends ChangeNotifier {
       notifyListeners();
 
       final docRef = await _firestore.collection('incomes').add(income.toFirestore());
-      
+
       // Add to local list with the generated ID
       final createdIncome = income.copyWith();
-      _incomes.insert(0, createdIncome); // Insert at beginning for recent first
+      _incomes.insert(0, Income(
+        id: docRef.id,
+        amount: createdIncome.amount,
+        description: createdIncome.description,
+        category: createdIncome.category,
+        date: createdIncome.date,
+        addedBy: createdIncome.addedBy,
+        history: createdIncome.history,
+        companyId: createdIncome.companyId,
+      )); // Insert at beginning for recent first
 
       _isLoading = false;
       notifyListeners();
@@ -72,12 +81,27 @@ class IncomeProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      await _firestore.collection('incomes').doc(income.id).update(income.toFirestore());
+      // Append edit history entry before update
+      final updatedHistory = List<IncomeEditHistory>.from(income.history)
+        ..add(IncomeEditHistory(
+          amount: income.amount,
+          description: income.description,
+          category: income.category,
+          editedBy: income.addedBy,
+          timestamp: DateTime.now(),
+        ));
+
+      final incomeWithHistory = income.copyWith(history: updatedHistory);
+
+      await _firestore
+          .collection('incomes')
+          .doc(income.id)
+          .update(incomeWithHistory.toFirestore());
 
       // Update local list
       final index = _incomes.indexWhere((i) => i.id == income.id);
       if (index != -1) {
-        _incomes[index] = income;
+        _incomes[index] = incomeWithHistory;
       }
 
       _isLoading = false;
