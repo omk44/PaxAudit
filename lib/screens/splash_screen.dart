@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
           Navigator.pushReplacementNamed(context, '/ca_dashboard');
         }
       } else {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushReplacementNamed(context, '/home');
       }
     }
   }

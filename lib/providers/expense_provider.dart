@@ -1,68 +1,170 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense.dart';
 
 class ExpenseProvider extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
   final List<Expense> _expenses = [];
+  bool _isLoading = false;
+  String? _error;
+
   List<Expense> get expenses => List.unmodifiable(_expenses);
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  
+  // Calculate total expense amount
+  double get totalExpense => _expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+  
+  // Calculate total GST paid
+  double get totalGst => _expenses.fold(0.0, (sum, expense) => sum + expense.gstAmount);
 
-  void addExpense({
-    required String categoryId,
-    required double amount,
-    required double cgst,
-    required double sgst,
-    required String invoiceNumber,
-    required DateTime date,
-    required String addedBy,
-    required String bankAccount,
-  }) {
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final now = DateTime.now();
-    final expense = Expense(
-      id: id,
-      categoryId: categoryId,
-      amount: amount,
-      cgst: cgst,
-      sgst: sgst,
-      invoiceNumber: invoiceNumber,
-      date: date,
-      addedBy: addedBy,
-      bankAccount: bankAccount,
-      history: [ExpenseEditHistory(
-        amount: amount,
-        cgst: cgst,
-        sgst: sgst,
-        invoiceNumber: invoiceNumber,
-        editedBy: addedBy,
-        timestamp: now,
-      )],
-    );
-    _expenses.add(expense);
-    notifyListeners();
+  // Load expenses for a specific company
+  Future<void> loadExpensesForCompany(String companyId) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final snapshot = await _firestore
+          .collection('expenses')
+          .where('companyId', isEqualTo: companyId)
+          .orderBy('date', descending: true)
+          .get();
+
+      _expenses.clear();
+      _expenses.addAll(snapshot.docs.map((doc) => Expense.fromFirestore(doc)));
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load expenses: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  void editExpense(String id, double amount, double cgst, double sgst, String invoiceNumber, String editedBy, String bankAccount) {
-    final exp = _expenses.firstWhere((e) => e.id == id);
-    exp.amount = amount;
-    exp.cgst = cgst;
-    exp.sgst = sgst;
-    exp.invoiceNumber = invoiceNumber;
-    exp.bankAccount = bankAccount;
-    exp.history.add(ExpenseEditHistory(
-      amount: amount,
-      cgst: cgst,
-      sgst: sgst,
-      invoiceNumber: invoiceNumber,
-      editedBy: editedBy,
-      timestamp: DateTime.now(),
-    ));
-    notifyListeners();
+  // Add a new expense
+  Future<bool> addExpense(Expense expense) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final docRef = await _firestore.collection('expenses').add(expense.toFirestore());
+      
+      // Add to local list with the generated ID
+      final createdExpense = expense.copyWith();
+      _expenses.insert(0, createdExpense); // Insert at beginning for recent first
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to add expense: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
-  void deleteExpense(String id) {
-    _expenses.removeWhere((e) => e.id == id);
-    notifyListeners();
+  // Update an expense
+  Future<bool> updateExpense(Expense expense) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _firestore.collection('expenses').doc(expense.id).update(expense.toFirestore());
+
+      // Update local list
+      final index = _expenses.indexWhere((e) => e.id == expense.id);
+      if (index != -1) {
+        _expenses[index] = expense;
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to update expense: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
-  double get totalGst => _expenses.fold(0, (sum, e) => sum + e.totalGst);
-  double get totalExpense => _expenses.fold(0, (sum, e) => sum + e.amount);
+  // Delete an expense
+  Future<bool> deleteExpense(String id) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _firestore.collection('expenses').doc(id).delete();
+      
+      _expenses.removeWhere((e) => e.id == id);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete expense: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Edit expense (alias for updateExpense)
+  Future<bool> editExpense(Expense expense) async {
+    return await updateExpense(expense);
+  }
+
+  // Get expense by ID
+  Expense? getExpenseById(String id) {
+    try {
+      return _expenses.firstWhere((e) => e.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Get total expenses amount
+  double get totalAmount {
+    return _expenses.fold(0.0, (sum, expense) => sum + expense.totalAmount);
+  }
+
+  // Get total GST amount
+  double get totalGstAmount {
+    return _expenses.fold(0.0, (sum, expense) => sum + expense.gstAmount);
+  }
+
+  // Get total base amount (without GST)
+  double get totalBaseAmount {
+    return _expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+  }
+
+  // Get expenses by category
+  List<Expense> getExpensesByCategory(String categoryId) {
+    return _expenses.where((e) => e.categoryId == categoryId).toList();
+  }
+
+  // Get expenses by payment method
+  List<Expense> getExpensesByPaymentMethod(PaymentMethod method) {
+    return _expenses.where((e) => e.paymentMethod == method).toList();
+  }
+
+  // Get expenses by date range
+  List<Expense> getExpensesByDateRange(DateTime startDate, DateTime endDate) {
+    return _expenses.where((e) => 
+      e.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
+      e.date.isBefore(endDate.add(const Duration(days: 1)))
+    ).toList();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
 }

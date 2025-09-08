@@ -24,7 +24,16 @@ class AdminDashboard extends StatelessWidget {
       body: ListView(
         children: [
           ListTile(
+            leading: const Icon(Icons.business, color: Colors.blue),
+            title: const Text('Company Details'),
+            subtitle: const Text('View company information and statistics'),
+            onTap: () => Navigator.pushNamed(context, '/admin_details'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.people, color: Colors.green),
             title: const Text('CA Management'),
+            subtitle: const Text('Manage Chartered Accountants'),
             onTap: () => Navigator.pushNamed(context, '/ca_management'),
           ),
           ListTile(

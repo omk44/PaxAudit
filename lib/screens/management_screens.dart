@@ -15,8 +15,36 @@ import '../widgets/dialogs/income_dialogs.dart';
 import '../widgets/dialogs/expense_dialogs.dart';
 
 // --- CA Management Screen (Admin only) ---
-class CAManagementScreen extends StatelessWidget {
+class CAManagementScreen extends StatefulWidget {
   const CAManagementScreen({super.key});
+
+  @override
+  State<CAManagementScreen> createState() => _CAManagementScreenState();
+}
+
+class _CAManagementScreenState extends State<CAManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final caProvider = Provider.of<CAProvider>(context, listen: false);
+    final companyId = auth.selectedCompany?.id;
+    if (companyId != null) {
+      await caProvider.loadCAsForCompany(companyId);
+    } else {
+      // Fallback: show none if no company selected
+      await caProvider.loadCAsForCompany('__none__');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,35 +54,39 @@ class CAManagementScreen extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              itemCount: caProvider.cas.length,
-              itemBuilder: (context, index) {
-                final ca = caProvider.cas[index];
-                return ListTile(
-                  title: Text(ca.username),
-                  subtitle: Text('ID: ${ca.id}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => CAEditDialog(ca: ca),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () {
-                          caProvider.deleteCA(ca.id);
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: caProvider.cas.length,
+                itemBuilder: (context, index) {
+                  final ca = caProvider.cas[index];
+                  return ListTile(
+                    title: Text(ca.name),
+                    subtitle: Text('ID: ${ca.id}  •  Email: ${ca.email}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => CAEditDialog(ca: ca),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () {
+                            caProvider.deleteCA(ca.id);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           Padding(
@@ -62,11 +94,13 @@ class CAManagementScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.add),
               label: const Text('Add CA'),
-              onPressed: () {
-                showDialog(
+              onPressed: () async {
+                await showDialog(
                   context: context,
                   builder: (_) => const CAAddDialog(),
                 );
+                // Reload list after adding
+                if (mounted) _refresh();
               },
             ),
           ),
@@ -115,7 +149,10 @@ class CategoryManagementScreen extends StatelessWidget {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (_) => CategoryAddDialog(editedBy: 'admin'),
+                  builder: (_) => CategoryAddDialog(
+                    editedBy: 'admin',
+                    companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+                  ),
                 );
               },
             ),
@@ -142,7 +179,10 @@ class IncomeManagementScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog(
           context: context,
-          builder: (_) => IncomeAddDialog(addedBy: auth.role ?? 'admin'),
+          builder: (_) => IncomeAddDialog(
+            addedBy: auth.role ?? 'admin',
+            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+          ),
         ),
         icon: const Icon(Icons.add),
         label: const Text('Add Income'),
@@ -207,7 +247,10 @@ class IncomeManagementScreen extends StatelessWidget {
                     onPressed: () => showDialog(
                       context: context,
                       builder: (_) =>
-                          IncomeAddDialog(addedBy: auth.role ?? 'admin'),
+                          IncomeAddDialog(
+                            addedBy: auth.role ?? 'admin',
+                            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+                          ),
                     ),
                     icon: const Icon(Icons.add),
                     label: const Text('Add Income'),
@@ -236,7 +279,10 @@ class ExpenseManagementScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog(
           context: context,
-          builder: (_) => ExpenseAddDialog(addedBy: auth.role ?? 'admin'),
+          builder: (_) => ExpenseAddDialog(
+            addedBy: auth.role ?? 'admin',
+            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+          ),
         ),
         icon: const Icon(Icons.add),
         label: const Text('Add Expense'),
@@ -254,19 +300,21 @@ class ExpenseManagementScreen extends StatelessWidget {
                             (c) => c.id == exp.categoryId,
                             orElse: () => Category(
                               id: '',
-                              name: 'Deleted',
+                              name: 'Unknown',
+                              gstPercentage: 0.0,
                               lastEditedBy: '',
                               lastEditedAt: DateTime.now(),
                               history: [],
+                              companyId: '',
                             ),
                           )
                           .name;
                       return ListTile(
                         title: Text(
-                          'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.totalGst.toStringAsFixed(2)}',
+                          'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
                         ),
                         subtitle: Text(
-                          'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.bankAccount}\nDate: ${dt.format(exp.date.toLocal())}',
+                          'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${dt.format(exp.date.toLocal())}',
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -315,7 +363,10 @@ class ExpenseManagementScreen extends StatelessWidget {
                     onPressed: () => showDialog(
                       context: context,
                       builder: (_) =>
-                          ExpenseAddDialog(addedBy: auth.role ?? 'admin'),
+                          ExpenseAddDialog(
+                            addedBy: auth.role ?? 'admin',
+                            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+                          ),
                     ),
                     icon: const Icon(Icons.add),
                     label: const Text('Add Expense'),
@@ -386,12 +437,12 @@ class _IncomeExpenseManagerScreenState
 
     final bankAccounts = <String>{
       'All',
-      ...allExpenses.map((e) => e.bankAccount),
+      ...allExpenses.map((e) => e.paymentMethod.name),
     }.toList()..sort();
 
     final incomes = allIncomes; // no bank filter for incomes
     final expenses = allExpenses
-        .where((e) => _bankFilter == 'All' || e.bankAccount == _bankFilter)
+        .where((e) => _bankFilter == 'All' || e.paymentMethod.name == _bankFilter)
         .toList();
 
     return Scaffold(
@@ -531,18 +582,20 @@ class _IncomeExpenseManagerScreenState
                         orElse: () => Category(
                           id: '',
                           name: 'Deleted',
+                          gstPercentage: 0.0,
                           lastEditedBy: '',
                           lastEditedAt: DateTime.now(),
                           history: [],
+                          companyId: '',
                         ),
                       )
                       .name;
                   return ListTile(
                     title: Text(
-                      'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.totalGst.toStringAsFixed(2)}',
+                      'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
                     ),
                     subtitle: Text(
-                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.bankAccount}\nDate: ${_formatDate(exp.date)}',
+                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${_formatDate(exp.date)}',
                     ),
                     onTap: () => showDialog(
                       context: context,

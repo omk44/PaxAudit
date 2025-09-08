@@ -14,166 +14,172 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   String _email = '';
   String _password = '';
-  String _role = 'admin';
   String? _error;
   bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Login to PaxAudit'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Administrator Login'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: const Color(0xFF6366F1),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // App Logo/Title
-              const Icon(
-                Icons.account_balance,
-                size: 80,
-                color: Colors.deepPurple,
+              // Header
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.admin_panel_settings,
+                        size: 40,
+                        color: Color(0xFF6366F1),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Welcome Back!',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sign in to your administrator account',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+
+              // Email Input
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address',
+                    hintText: 'Enter your email address',
+                    prefixIcon: Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (val) => _email = val.trim(),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) {
+                      return 'Please enter your email address';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
+                      return 'Please enter a valid email address';
+                    }
+                    return null;
+                  },
+                ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Welcome to PaxAudit',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Your Financial Management Solution',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 32),
 
-              // Role Selection
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Select Your Role',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _role,
-                        decoration: const InputDecoration(
-                          labelText: 'Role',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'admin',
-                            child: Text('Administrator'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ca',
-                            child: Text('Chartered Accountant'),
-                          ),
-                        ],
-                        onChanged: (val) =>
-                            setState(() => _role = val ?? 'admin'),
-                        validator: (val) =>
-                            val == null ? 'Please select a role' : null,
-                      ),
-                    ],
+              // Password Input
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    hintText: 'Enter your password',
+                    prefixIcon: Icon(Icons.lock_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
                   ),
+                  obscureText: true,
+                  onChanged: (val) => _password = val,
+                  validator: (val) {
+                    if (val == null || val.isEmpty) {
+                      return 'Please enter your password';
+                    }
+                    if (val.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Login Form
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Login Credentials',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email),
-                          hintText: 'Enter your email address',
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                        onChanged: (val) => _email = val.trim(),
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Please enter your email address';
-                          }
-                          if (!RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                          ).hasMatch(val)) {
-                            return 'Please enter a valid email address';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.lock),
-                          hintText: 'Enter your password',
-                        ),
-                        obscureText: true,
-                        onChanged: (val) => _password = val,
-                        validator: (val) {
-                          if (val == null || val.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          if (val.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 24),
 
               // Error Message
-              if (_error != null)
+              if (_error != null) ...[
                 Container(
-                  margin: const EdgeInsets.only(top: 16),
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
-                    border: Border.all(color: Colors.red.shade300),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error, color: Colors.red.shade700),
+                      Icon(Icons.error_outline, color: Colors.red.shade700),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -184,16 +190,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-
-              const SizedBox(height: 24),
+                const SizedBox(height: 16),
+              ],
 
               // Login Button
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color(0xFF6366F1),
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
@@ -201,15 +210,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text(
-                        'Login',
+                        'Sign In',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -218,16 +225,30 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 16),
 
               // Sign Up Link
-              if (_role == 'admin')
-                TextButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () => Navigator.pushNamed(context, '/signup'),
-                  child: const Text(
-                    'Don\'t have an account? Sign up as Administrator',
-                    style: TextStyle(fontSize: 16),
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.pushNamed(context, '/signup'),
+                child: const Text(
+                  'Don\'t have an account? Create Company Account',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF6366F1),
                   ),
                 ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Back to Home Link
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Back to Home',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF6366F1),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -248,19 +269,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.signInWithEmailAndPassword(
         _email,
         _password,
-        _role,
+        'admin',
       );
 
       if (success) {
-        if (_role == 'admin') {
-          Navigator.pushReplacementNamed(context, '/admin_dashboard');
-        } else {
-          Navigator.pushReplacementNamed(context, '/ca_dashboard');
-        }
+        Navigator.pushReplacementNamed(context, '/admin_dashboard');
       } else {
         setState(() {
-          _error =
-              'Invalid credentials or role mismatch. Please check your email, password, and selected role.';
+          _error = 'Invalid credentials. Please check your email and password.';
         });
       }
     } catch (e) {

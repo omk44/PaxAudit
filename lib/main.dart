@@ -6,13 +6,17 @@ import 'firebase_options.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/ca_provider.dart';
+import 'providers/company_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/income_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/ca_login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/admin_dashboard.dart';
+import 'screens/admin_details_screen.dart';
 import 'screens/ca_dashboard.dart';
 import 'screens/management_screens.dart';
 import 'screens/ca_details_screen.dart';
@@ -42,6 +46,7 @@ class PaxAuditApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CAProvider()),
+        ChangeNotifierProvider(create: (_) => CompanyProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => IncomeProvider()),
@@ -55,9 +60,12 @@ class PaxAuditApp extends StatelessWidget {
         initialRoute: '/',
         routes: {
           '/': (context) => const SplashScreen(),
+          '/home': (context) => const HomeScreen(),
           '/login': (context) => const LoginScreen(),
+          '/ca_login': (context) => const CALoginScreen(),
           '/signup': (context) => const SignupScreen(),
           '/admin_dashboard': (context) => const AdminDashboard(),
+          '/admin_details': (context) => const AdminDetailsScreen(),
           '/ca_dashboard': (context) => const CADashboard(),
           '/ca_management': (context) => const CAManagementScreen(),
           '/ca_details': (context) => const CADetailsScreen(),

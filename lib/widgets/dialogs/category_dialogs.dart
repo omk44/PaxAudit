@@ -8,7 +8,8 @@ import '../../models/category.dart';
 // --- Add Category Dialog ---
 class CategoryAddDialog extends StatefulWidget {
   final String editedBy;
-  const CategoryAddDialog({required this.editedBy, super.key});
+  final String companyId;
+  const CategoryAddDialog({required this.editedBy, required this.companyId, super.key});
 
   @override
   State<CategoryAddDialog> createState() => _CategoryAddDialogState();
@@ -17,6 +18,7 @@ class CategoryAddDialog extends StatefulWidget {
 class _CategoryAddDialogState extends State<CategoryAddDialog> {
   final _formKey = GlobalKey<FormState>();
   String _name = '';
+  double _gstPercentage = 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -24,11 +26,23 @@ class _CategoryAddDialogState extends State<CategoryAddDialog> {
       title: const Text('Add Category'),
       content: Form(
         key: _formKey,
-        child: TextFormField(
-          decoration: const InputDecoration(labelText: 'Category Name'),
-          onChanged: (val) => _name = val,
-          validator: (val) =>
-              val == null || val.isEmpty ? 'Enter category name' : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Category Name'),
+              onChanged: (val) => _name = val,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Enter category name' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'GST Percentage (%)'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => _gstPercentage = double.tryParse(val) ?? 0.0,
+              validator: (val) => null,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -42,7 +56,15 @@ class _CategoryAddDialogState extends State<CategoryAddDialog> {
               Provider.of<CategoryProvider>(
                 context,
                 listen: false,
-              ).addCategory(_name, widget.editedBy);
+              ).addCategory(Category(
+                id: '',
+                name: _name,
+                gstPercentage: _gstPercentage,
+                lastEditedBy: widget.editedBy,
+                lastEditedAt: DateTime.now(),
+                history: [],
+                companyId: widget.companyId,
+              ));
               Navigator.pop(context);
             }
           },

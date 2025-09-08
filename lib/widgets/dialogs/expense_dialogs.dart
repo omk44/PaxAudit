@@ -5,11 +5,13 @@ import 'package:intl/intl.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../models/expense.dart';
+import '../../models/category.dart';
 
 // --- Add Expense Dialog ---
 class ExpenseAddDialog extends StatefulWidget {
   final String addedBy;
-  const ExpenseAddDialog({required this.addedBy, super.key});
+  final String companyId;
+  const ExpenseAddDialog({required this.addedBy, required this.companyId, super.key});
 
   @override
   State<ExpenseAddDialog> createState() => _ExpenseAddDialogState();
@@ -17,12 +19,14 @@ class ExpenseAddDialog extends StatefulWidget {
 
 class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
   final _formKey = GlobalKey<FormState>();
-  String? _categoryId;
+  String _selectedCategoryId = '';
+  String _selectedCategoryName = '';
   double _amount = 0;
-  double _cgst = 0;
-  double _sgst = 0;
+  double _gstPercentage = 0.0;
+  double _gstAmount = 0.0;
   String _invoiceNumber = '';
-  String _bankAccount = 'Cash';
+  String _description = '';
+  PaymentMethod _paymentMethod = PaymentMethod.cash;
   DateTime _date = DateTime.now();
 
   @override
@@ -37,7 +41,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _categoryId,
+                value: _selectedCategoryId.isEmpty ? null : _selectedCategoryId,
                 items: categoryProvider.categories
                     .map(
                       (cat) => DropdownMenuItem(
@@ -46,33 +50,59 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                       ),
                     )
                     .toList(),
-                onChanged: (val) => setState(() => _categoryId = val),
+                onChanged: (val) => setState(() {
+                  _selectedCategoryId = val ?? '';
+                  _selectedCategoryName = categoryProvider.categories
+                      .firstWhere((cat) => cat.id == val, orElse: () => Category(
+                            id: '',
+                            name: '',
+                            gstPercentage: 0.0,
+                            lastEditedBy: '',
+                            lastEditedAt: DateTime.now(),
+                            history: [],
+                            companyId: '',
+                          ))
+                      .name;
+                }),
                 decoration: const InputDecoration(labelText: 'Category'),
                 validator: (val) => val == null ? 'Select category' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
-                onChanged: (val) => _amount = double.tryParse(val) ?? 0,
+                onChanged: (val) {
+                  setState(() {
+                    _amount = double.tryParse(val) ?? 0;
+                    // Calculate GST based on selected category
+                    if (_selectedCategoryId.isNotEmpty) {
+                      final category = categoryProvider.categories
+                          .firstWhere((cat) => cat.id == _selectedCategoryId);
+                      _gstPercentage = category.gstPercentage;
+                      _gstAmount = (_amount * _gstPercentage) / 100;
+                    }
+                  });
+                },
                 validator: (val) => val == null || double.tryParse(val) == null
                     ? 'Enter amount'
                     : null,
               ),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'CGST %'),
+                decoration: const InputDecoration(labelText: 'GST % (Auto-calculated)'),
                 keyboardType: TextInputType.number,
-                onChanged: (val) => _cgst = double.tryParse(val) ?? 0,
-                validator: (val) => val == null || double.tryParse(val) == null
-                    ? 'Enter CGST %'
-                    : null,
+                initialValue: _gstPercentage.toString(),
+                readOnly: true,
               ),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'SGST %'),
+                decoration: const InputDecoration(labelText: 'GST Amount (Auto-calculated)'),
                 keyboardType: TextInputType.number,
-                onChanged: (val) => _sgst = double.tryParse(val) ?? 0,
-                validator: (val) => val == null || double.tryParse(val) == null
-                    ? 'Enter SGST %'
-                    : null,
+                initialValue: _gstAmount.toStringAsFixed(2),
+                readOnly: true,
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Description'),
+                onChanged: (val) => _description = val,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Enter description' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Invoice Number'),
@@ -80,19 +110,15 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Enter invoice number' : null,
               ),
-              DropdownButtonFormField<String>(
-                value: _bankAccount,
-                items: const [
-                  DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                  DropdownMenuItem(value: 'Bank1', child: Text('Bank1')),
-                  DropdownMenuItem(value: 'Bank2', child: Text('Bank2')),
-                  DropdownMenuItem(value: 'Bank3', child: Text('Bank3')),
-                  DropdownMenuItem(value: 'Bank4', child: Text('Bank4')),
-                  DropdownMenuItem(value: 'Bank5', child: Text('Bank5')),
-                ],
-                onChanged: (val) =>
-                    setState(() => _bankAccount = val ?? 'Cash'),
-                decoration: const InputDecoration(labelText: 'Bank Account'),
+              DropdownButtonFormField<PaymentMethod>(
+                value: _paymentMethod,
+                items: PaymentMethod.values.map((method) => DropdownMenuItem(
+                  value: method,
+                  child: Text('${method.icon} ${method.displayName}'),
+                )).toList(),
+                onChanged: (val) => setState(() => _paymentMethod = val ?? PaymentMethod.cash),
+                decoration: const InputDecoration(labelText: 'Payment Method'),
+                validator: (val) => val == null ? 'Select payment method' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Date'),
@@ -124,16 +150,21 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Provider.of<ExpenseProvider>(context, listen: false).addExpense(
-                categoryId: _categoryId!,
+              Provider.of<ExpenseProvider>(context, listen: false).addExpense(Expense(
+                id: '',
+                categoryId: _selectedCategoryId,
+                categoryName: _selectedCategoryName,
                 amount: _amount,
-                cgst: _cgst,
-                sgst: _sgst,
+                gstPercentage: _gstPercentage,
+                gstAmount: _gstAmount,
                 invoiceNumber: _invoiceNumber,
+                description: _description,
                 date: _date,
                 addedBy: widget.addedBy,
-                bankAccount: _bankAccount,
-              );
+                paymentMethod: _paymentMethod,
+                history: [],
+                companyId: widget.companyId,
+              ));
               Navigator.pop(context);
             }
           },
@@ -162,20 +193,24 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _categoryId;
   late double _amount;
-  late double _cgst;
-  late double _sgst;
+  late double _gstPercentage;
+  late double _gstAmount;
   late String _invoiceNumber;
-  late String _bankAccount;
+  late String _description;
+  late PaymentMethod _paymentMethod;
+  late DateTime _date;
 
   @override
   void initState() {
     super.initState();
     _categoryId = widget.expense.categoryId;
     _amount = widget.expense.amount;
-    _cgst = widget.expense.cgst;
-    _sgst = widget.expense.sgst;
+    _gstPercentage = widget.expense.gstPercentage;
+    _gstAmount = widget.expense.gstAmount;
     _invoiceNumber = widget.expense.invoiceNumber;
-    _bankAccount = widget.expense.bankAccount;
+    _description = widget.expense.description;
+    _paymentMethod = widget.expense.paymentMethod;
+    _date = widget.expense.date;
   }
 
   @override
@@ -215,20 +250,16 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                     val == null || val.isEmpty ? 'Enter amount' : null,
               ),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'CGST (%)'),
+                decoration: const InputDecoration(labelText: 'GST % (Auto-calculated)'),
                 keyboardType: TextInputType.number,
-                initialValue: _cgst.toString(),
-                onChanged: (val) => _cgst = double.tryParse(val) ?? 0.0,
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Enter CGST' : null,
+                initialValue: _gstPercentage.toString(),
+                readOnly: true,
               ),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'SGST (%)'),
+                decoration: const InputDecoration(labelText: 'GST Amount (Auto-calculated)'),
                 keyboardType: TextInputType.number,
-                initialValue: _sgst.toString(),
-                onChanged: (val) => _sgst = double.tryParse(val) ?? 0.0,
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Enter SGST' : null,
+                initialValue: _gstAmount.toStringAsFixed(2),
+                readOnly: true,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Invoice Number'),
@@ -237,19 +268,15 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Enter invoice number' : null,
               ),
-              DropdownButtonFormField<String>(
-                value: _bankAccount,
-                items: const [
-                  DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                  DropdownMenuItem(value: 'Bank1', child: Text('Bank1')),
-                  DropdownMenuItem(value: 'Bank2', child: Text('Bank2')),
-                  DropdownMenuItem(value: 'Bank3', child: Text('Bank3')),
-                  DropdownMenuItem(value: 'Bank4', child: Text('Bank4')),
-                  DropdownMenuItem(value: 'Bank5', child: Text('Bank5')),
-                ],
-                onChanged: (val) =>
-                    setState(() => _bankAccount = val ?? 'Cash'),
-                decoration: const InputDecoration(labelText: 'Bank Account'),
+              DropdownButtonFormField<PaymentMethod>(
+                value: _paymentMethod,
+                items: PaymentMethod.values.map((method) => DropdownMenuItem(
+                  value: method,
+                  child: Text('${method.icon} ${method.displayName}'),
+                )).toList(),
+                onChanged: (val) => setState(() => _paymentMethod = val ?? PaymentMethod.cash),
+                decoration: const InputDecoration(labelText: 'Payment Method'),
+                validator: (val) => val == null ? 'Select payment method' : null,
               ),
             ],
           ),
@@ -264,13 +291,17 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Provider.of<ExpenseProvider>(context, listen: false).editExpense(
-                widget.expense.id,
-                _amount,
-                _cgst,
-                _sgst,
-                _invoiceNumber,
-                widget.editedBy,
-                _bankAccount,
+                widget.expense.copyWith(
+                  categoryId: _categoryId!,
+                  amount: _amount,
+                  gstPercentage: _gstPercentage,
+                  gstAmount: _gstAmount,
+                  invoiceNumber: _invoiceNumber,
+                  description: _description,
+                  date: _date,
+                  addedBy: widget.editedBy,
+                  paymentMethod: _paymentMethod,
+                )
               );
               Navigator.pop(context);
             }
@@ -306,10 +337,10 @@ class ExpenseHistoryDialog extends StatelessWidget {
             final h = expense.history[index];
             return ListTile(
               title: Text(
-                'Amount: ${h.amount.toStringAsFixed(2)} | CGST: ${h.cgst.toStringAsFixed(2)} | SGST: ${h.sgst.toStringAsFixed(2)} | Invoice: ${h.invoiceNumber}',
+                'Amount: ${h.amount.toStringAsFixed(2)} | GST: ${h.gstAmount.toStringAsFixed(2)} | Invoice: ${h.invoiceNumber}',
               ),
               subtitle: Text(
-                'By: ${h.editedBy} at ${dt.format(h.timestamp.toLocal())} | Bank: ${expense.bankAccount}',
+                'By: ${h.editedBy} at ${dt.format(h.timestamp.toLocal())} | Bank: ${expense.paymentMethod.displayName}',
               ),
             );
           },

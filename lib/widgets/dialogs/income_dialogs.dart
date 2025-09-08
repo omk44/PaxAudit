@@ -8,7 +8,8 @@ import '../../models/income.dart';
 // --- Add Income Dialog ---
 class IncomeAddDialog extends StatefulWidget {
   final String addedBy;
-  const IncomeAddDialog({required this.addedBy, super.key});
+  final String companyId;
+  const IncomeAddDialog({required this.addedBy, required this.companyId, super.key});
 
   @override
   State<IncomeAddDialog> createState() => _IncomeAddDialogState();
@@ -17,6 +18,8 @@ class IncomeAddDialog extends StatefulWidget {
 class _IncomeAddDialogState extends State<IncomeAddDialog> {
   final _formKey = GlobalKey<FormState>();
   double _amount = 0.0;
+  String _description = '';
+  String _category = '';
   DateTime _date = DateTime.now();
 
   @override
@@ -34,6 +37,20 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
               onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
               validator: (val) =>
                   val == null || val.isEmpty ? 'Enter amount' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Description'),
+              onChanged: (val) => _description = val,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Enter description' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Category'),
+              onChanged: (val) => _category = val,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Enter category' : null,
             ),
             TextFormField(
               decoration: const InputDecoration(labelText: 'Date'),
@@ -66,11 +83,16 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Provider.of<IncomeProvider>(context, listen: false).addIncome(
+              Provider.of<IncomeProvider>(context, listen: false).addIncome(Income(
+                id: '',
                 amount: _amount,
+                description: _description,
+                category: _category,
                 date: _date,
                 addedBy: widget.addedBy,
-              );
+                history: [],
+                companyId: widget.companyId,
+              ));
               Navigator.pop(context);
             }
           },
