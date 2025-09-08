@@ -52,10 +52,25 @@ class ExpenseProvider extends ChangeNotifier {
       notifyListeners();
 
       final docRef = await _firestore.collection('expenses').add(expense.toFirestore());
-      
+
       // Add to local list with the generated ID
-      final createdExpense = expense.copyWith();
-      _expenses.insert(0, createdExpense); // Insert at beginning for recent first
+      final createdExpense = expense.copyWith().copyWith(companyId: expense.companyId);
+      // Ensure the created expense carries the Firestore-generated id
+      _expenses.insert(0, Expense(
+        id: docRef.id,
+        categoryId: createdExpense.categoryId,
+        categoryName: createdExpense.categoryName,
+        amount: createdExpense.amount,
+        gstPercentage: createdExpense.gstPercentage,
+        gstAmount: createdExpense.gstAmount,
+        invoiceNumber: createdExpense.invoiceNumber,
+        description: createdExpense.description,
+        date: createdExpense.date,
+        addedBy: createdExpense.addedBy,
+        paymentMethod: createdExpense.paymentMethod,
+        history: createdExpense.history,
+        companyId: createdExpense.companyId,
+      )); // Insert at beginning for recent first
 
       _isLoading = false;
       notifyListeners();
@@ -75,12 +90,30 @@ class ExpenseProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      await _firestore.collection('expenses').doc(expense.id).update(expense.toFirestore());
+      // Append edit history entry before update
+      final updatedHistory = List<ExpenseEditHistory>.from(expense.history)
+        ..add(ExpenseEditHistory(
+          amount: expense.amount,
+          gstPercentage: expense.gstPercentage,
+          gstAmount: expense.gstAmount,
+          invoiceNumber: expense.invoiceNumber,
+          description: expense.description,
+          paymentMethod: expense.paymentMethod,
+          editedBy: expense.addedBy,
+          timestamp: DateTime.now(),
+        ));
+
+      final expenseWithHistory = expense.copyWith(history: updatedHistory);
+
+      await _firestore
+          .collection('expenses')
+          .doc(expense.id)
+          .update(expenseWithHistory.toFirestore());
 
       // Update local list
       final index = _expenses.indexWhere((e) => e.id == expense.id);
       if (index != -1) {
-        _expenses[index] = expense;
+        _expenses[index] = expenseWithHistory;
       }
 
       _isLoading = false;

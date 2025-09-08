@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/expense.dart';
 import '../../models/category.dart';
 
@@ -32,6 +33,13 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
   @override
   Widget build(BuildContext context) {
     final categoryProvider = Provider.of<CategoryProvider>(context);
+    // Ensure categories are loaded for the selected company before showing form
+    final companyId = Provider.of<AuthProvider>(context, listen: false).companyId;
+    if (categoryProvider.categories.isEmpty && companyId != null && companyId.isNotEmpty) {
+      // fire and forget; UI will rebuild when loaded
+      // ignore: discarded_futures
+      categoryProvider.loadCategoriesForCompany(companyId);
+    }
     return AlertDialog(
       title: const Text('Add Expense'),
       content: Form(
@@ -52,17 +60,22 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                     .toList(),
                 onChanged: (val) => setState(() {
                   _selectedCategoryId = val ?? '';
-                  _selectedCategoryName = categoryProvider.categories
-                      .firstWhere((cat) => cat.id == val, orElse: () => Category(
-                            id: '',
-                            name: '',
-                            gstPercentage: 0.0,
-                            lastEditedBy: '',
-                            lastEditedAt: DateTime.now(),
-                            history: [],
-                            companyId: '',
-                          ))
-                      .name;
+                  final selected = categoryProvider.categories
+                      .firstWhere(
+                        (cat) => cat.id == _selectedCategoryId,
+                        orElse: () => Category(
+                          id: '',
+                          name: '',
+                          gstPercentage: 0.0,
+                          lastEditedBy: '',
+                          lastEditedAt: DateTime.now(),
+                          history: [],
+                          companyId: '',
+                        ),
+                      );
+                  _selectedCategoryName = selected.name;
+                  _gstPercentage = selected.gstPercentage;
+                  _gstAmount = (_amount * _gstPercentage) / 100;
                 }),
                 decoration: const InputDecoration(labelText: 'Category'),
                 validator: (val) => val == null ? 'Select category' : null,
@@ -88,15 +101,13 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'GST % (Auto-calculated)'),
-                keyboardType: TextInputType.number,
-                initialValue: _gstPercentage.toString(),
                 readOnly: true,
+                controller: TextEditingController(text: _gstPercentage.toStringAsFixed(2)),
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'GST Amount (Auto-calculated)'),
-                keyboardType: TextInputType.number,
-                initialValue: _gstAmount.toStringAsFixed(2),
                 readOnly: true,
+                controller: TextEditingController(text: _gstAmount.toStringAsFixed(2)),
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Description'),
@@ -225,19 +236,30 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _categoryId,
+                value: categoryProvider.categories.any((c) => c.id == _categoryId)
+                    ? _categoryId
+                    : null,
                 decoration: const InputDecoration(labelText: 'Category'),
-                items: [
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text('Select a category'),
-                  ),
-                  ...categoryProvider.categories.map(
-                    (cat) =>
-                        DropdownMenuItem(value: cat.id, child: Text(cat.name)),
-                  ),
-                ],
-                onChanged: (val) => setState(() => _categoryId = val ?? ''),
+                items: categoryProvider.categories
+                    .map((cat) => DropdownMenuItem(value: cat.id, child: Text(cat.name)))
+                    .toList(),
+                onChanged: (val) => setState(() {
+                  _categoryId = val ?? '';
+                  final selected = categoryProvider.categories.firstWhere(
+                    (c) => c.id == _categoryId,
+                    orElse: () => Category(
+                      id: '',
+                      name: '',
+                      gstPercentage: 0.0,
+                      lastEditedBy: '',
+                      lastEditedAt: DateTime.now(),
+                      history: [],
+                      companyId: '',
+                    ),
+                  );
+                  _gstPercentage = selected.gstPercentage;
+                  _gstAmount = (_amount * _gstPercentage) / 100;
+                }),
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Select a category' : null,
               ),
@@ -245,21 +267,22 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                 decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
                 initialValue: _amount.toString(),
-                onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
+                onChanged: (val) => setState(() {
+                  _amount = double.tryParse(val) ?? 0.0;
+                  _gstAmount = (_amount * _gstPercentage) / 100;
+                }),
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Enter amount' : null,
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'GST % (Auto-calculated)'),
-                keyboardType: TextInputType.number,
-                initialValue: _gstPercentage.toString(),
                 readOnly: true,
+                controller: TextEditingController(text: _gstPercentage.toStringAsFixed(2)),
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'GST Amount (Auto-calculated)'),
-                keyboardType: TextInputType.number,
-                initialValue: _gstAmount.toStringAsFixed(2),
                 readOnly: true,
+                controller: TextEditingController(text: _gstAmount.toStringAsFixed(2)),
               ),
               TextFormField(
                 decoration: const InputDecoration(labelText: 'Invoice Number'),
@@ -267,6 +290,12 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                 onChanged: (val) => _invoiceNumber = val,
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Enter invoice number' : null,
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Description'),
+                initialValue: _description,
+                onChanged: (val) => _description = val,
+                validator: (val) => val == null || val.isEmpty ? 'Enter description' : null,
               ),
               DropdownButtonFormField<PaymentMethod>(
                 value: _paymentMethod,
@@ -277,6 +306,22 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                 onChanged: (val) => setState(() => _paymentMethod = val ?? PaymentMethod.cash),
                 decoration: const InputDecoration(labelText: 'Payment Method'),
                 validator: (val) => val == null ? 'Select payment method' : null,
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Date'),
+                readOnly: true,
+                controller: TextEditingController(
+                  text: _date.toLocal().toString().split(' ').first,
+                ),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _date,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => _date = picked);
+                },
               ),
             ],
           ),
@@ -292,7 +337,15 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
             if (_formKey.currentState!.validate()) {
               Provider.of<ExpenseProvider>(context, listen: false).editExpense(
                 widget.expense.copyWith(
-                  categoryId: _categoryId!,
+                  categoryId: _categoryId,
+                  categoryName: categoryProvider.categories
+                      .firstWhere(
+                        (c) => c.id == _categoryId,
+                        orElse: () => Category(
+                          id: '', name: '', gstPercentage: 0, lastEditedBy: '', lastEditedAt: DateTime.now(), history: [], companyId: '',
+                        ),
+                      )
+                      .name,
                   amount: _amount,
                   gstPercentage: _gstPercentage,
                   gstAmount: _gstAmount,
@@ -301,7 +354,7 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                   date: _date,
                   addedBy: widget.editedBy,
                   paymentMethod: _paymentMethod,
-                )
+                ),
               );
               Navigator.pop(context);
             }

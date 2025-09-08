@@ -171,11 +171,24 @@ class IncomeManagementScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final incomeProvider = Provider.of<IncomeProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
+    final companyId = auth.companyId ?? auth.selectedCompany?.id;
+    if (companyId != null && incomeProvider.incomes.isEmpty) {
+      // ignore: discarded_futures
+      incomeProvider.loadIncomesForCompany(companyId);
+    }
     final hasData = incomeProvider.incomes.isNotEmpty;
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Income Management')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.trending_up_rounded),
+            SizedBox(width: 8),
+            Text('Income Management'),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog(
           context: context,
@@ -271,11 +284,30 @@ class ExpenseManagementScreen extends StatelessWidget {
     final expenseProvider = Provider.of<ExpenseProvider>(context);
     final categoryProvider = Provider.of<CategoryProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
+    final companyId = auth.companyId ?? auth.selectedCompany?.id;
+    if (companyId != null) {
+      if (expenseProvider.expenses.isEmpty) {
+        // ignore: discarded_futures
+        expenseProvider.loadExpensesForCompany(companyId);
+      }
+      if (categoryProvider.categories.isEmpty) {
+        // ignore: discarded_futures
+        categoryProvider.loadCategoriesForCompany(companyId);
+      }
+    }
     final hasData = expenseProvider.expenses.isNotEmpty;
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Expense Management')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.trending_down_rounded),
+            SizedBox(width: 8),
+            Text('Expense Management'),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog(
           context: context,
@@ -446,7 +478,15 @@ class _IncomeExpenseManagerScreenState
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Income/Expense Viewer')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.attach_money_rounded),
+            SizedBox(width: 8),
+            Text('Income/Expense Viewer'),
+          ],
+        ),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(8.0),
