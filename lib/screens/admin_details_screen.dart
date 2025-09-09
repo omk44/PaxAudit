@@ -19,7 +19,10 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ignore: discarded_futures
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {

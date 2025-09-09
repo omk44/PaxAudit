@@ -30,7 +30,10 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
     super.didChangeDependencies();
     if (!_loadedOnce) {
       _loadedOnce = true;
-      _refresh();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // ignore: discarded_futures
+        _refresh();
+      });
     }
   }
 
@@ -111,14 +114,45 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
 }
 
 // --- Category Management Screen ---
-class CategoryManagementScreen extends StatelessWidget {
+class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
+
+  @override
+  State<CategoryManagementScreen> createState() => _CategoryManagementScreenState();
+}
+
+class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final ap = Provider.of<AuthProvider>(context, listen: false);
+        final cid = ap.companyId ?? ap.selectedCompany?.id;
+        if (cid != null && cid.isNotEmpty) {
+          await Provider.of<CategoryProvider>(context, listen: false)
+              .loadCategoriesForCompany(cid);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final categoryProvider = Provider.of<CategoryProvider>(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Category Management')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.category_rounded),
+            SizedBox(width: 8),
+            Text('Category Management'),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -127,14 +161,14 @@ class CategoryManagementScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final cat = categoryProvider.categories[index];
                 return ListTile(
+                  leading: const Icon(Icons.label_outline_rounded),
                   title: Text(cat.name),
-                  subtitle: Text('ID: ${cat.id}'),
+                  subtitle: Text('GST: ${cat.gstPercentage.toStringAsFixed(2)}%  •  ID: ${cat.id}'),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      // Note: This would need a deleteCategory method in CategoryProvider
-                      // For now, we'll just remove from the list
-                      categoryProvider.categories.removeAt(index);
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: () async {
+                      await Provider.of<CategoryProvider>(context, listen: false)
+                          .deleteCategory(cat.id);
                     },
                   ),
                 );
@@ -144,14 +178,16 @@ class CategoryManagementScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_circle_rounded),
               label: const Text('Add Category'),
               onPressed: () {
+                final ap = Provider.of<AuthProvider>(context, listen: false);
+                final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
                 showDialog(
                   context: context,
                   builder: (_) => CategoryAddDialog(
                     editedBy: 'admin',
-                    companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
+                    companyId: cid,
                   ),
                 );
               },
@@ -164,18 +200,36 @@ class CategoryManagementScreen extends StatelessWidget {
 }
 
 // --- Income Management Screen ---
-class IncomeManagementScreen extends StatelessWidget {
+class IncomeManagementScreen extends StatefulWidget {
   const IncomeManagementScreen({super.key});
+
+  @override
+  State<IncomeManagementScreen> createState() => _IncomeManagementScreenState();
+}
+
+class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final companyId = auth.companyId ?? auth.selectedCompany?.id;
+        if (companyId != null) {
+          await Provider.of<IncomeProvider>(context, listen: false)
+              .loadIncomesForCompany(companyId);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final incomeProvider = Provider.of<IncomeProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
-    final companyId = auth.companyId ?? auth.selectedCompany?.id;
-    if (companyId != null && incomeProvider.incomes.isEmpty) {
-      // ignore: discarded_futures
-      incomeProvider.loadIncomesForCompany(companyId);
-    }
     final hasData = incomeProvider.incomes.isNotEmpty;
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
@@ -190,13 +244,17 @@ class IncomeManagementScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => IncomeAddDialog(
-            addedBy: auth.role ?? 'admin',
-            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
-          ),
-        ),
+        onPressed: () {
+          final ap = Provider.of<AuthProvider>(context, listen: false);
+          final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+          showDialog(
+            context: context,
+            builder: (_) => IncomeAddDialog(
+              addedBy: auth.role ?? 'admin',
+              companyId: cid,
+            ),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Income'),
       ),
@@ -257,14 +315,17 @@ class IncomeManagementScreen extends StatelessWidget {
                   const Text('No incomes yet.'),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) =>
-                          IncomeAddDialog(
-                            addedBy: auth.role ?? 'admin',
-                            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
-                          ),
-                    ),
+                    onPressed: () {
+                      final ap = Provider.of<AuthProvider>(context, listen: false);
+                      final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+                      showDialog(
+                        context: context,
+                        builder: (_) => IncomeAddDialog(
+                          addedBy: auth.role ?? 'admin',
+                          companyId: cid,
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Income'),
                   ),
@@ -276,25 +337,39 @@ class IncomeManagementScreen extends StatelessWidget {
 }
 
 // --- Expense Management Screen ---
-class ExpenseManagementScreen extends StatelessWidget {
+class ExpenseManagementScreen extends StatefulWidget {
   const ExpenseManagementScreen({super.key});
+
+  @override
+  State<ExpenseManagementScreen> createState() => _ExpenseManagementScreenState();
+}
+
+class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final companyId = auth.companyId ?? auth.selectedCompany?.id;
+        if (companyId != null) {
+          await Provider.of<ExpenseProvider>(context, listen: false)
+              .loadExpensesForCompany(companyId);
+          await Provider.of<CategoryProvider>(context, listen: false)
+              .loadCategoriesForCompany(companyId);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final expenseProvider = Provider.of<ExpenseProvider>(context);
     final categoryProvider = Provider.of<CategoryProvider>(context);
     final auth = Provider.of<AuthProvider>(context);
-    final companyId = auth.companyId ?? auth.selectedCompany?.id;
-    if (companyId != null) {
-      if (expenseProvider.expenses.isEmpty) {
-        // ignore: discarded_futures
-        expenseProvider.loadExpensesForCompany(companyId);
-      }
-      if (categoryProvider.categories.isEmpty) {
-        // ignore: discarded_futures
-        categoryProvider.loadCategoriesForCompany(companyId);
-      }
-    }
     final hasData = expenseProvider.expenses.isNotEmpty;
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
@@ -309,13 +384,17 @@ class ExpenseManagementScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => ExpenseAddDialog(
-            addedBy: auth.role ?? 'admin',
-            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
-          ),
-        ),
+        onPressed: () {
+          final ap = Provider.of<AuthProvider>(context, listen: false);
+          final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+          showDialog(
+            context: context,
+            builder: (_) => ExpenseAddDialog(
+              addedBy: auth.role ?? 'admin',
+              companyId: cid,
+            ),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Expense'),
       ),
@@ -392,14 +471,17 @@ class ExpenseManagementScreen extends StatelessWidget {
                   const Text('No expenses yet.'),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) =>
-                          ExpenseAddDialog(
-                            addedBy: auth.role ?? 'admin',
-                            companyId: Provider.of<AuthProvider>(context, listen: false).companyId ?? '',
-                          ),
-                    ),
+                    onPressed: () {
+                      final ap = Provider.of<AuthProvider>(context, listen: false);
+                      final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+                      showDialog(
+                        context: context,
+                        builder: (_) => ExpenseAddDialog(
+                          addedBy: auth.role ?? 'admin',
+                          companyId: cid,
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Expense'),
                   ),

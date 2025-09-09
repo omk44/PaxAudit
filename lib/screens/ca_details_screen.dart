@@ -230,6 +230,43 @@ class CADetailsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Recent transactions preview (mirrors admin style)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Row(
+                    children: [
+                      Icon(Icons.receipt_long_rounded, color: Color(0xFF6366F1)),
+                      SizedBox(width: 8),
+                      Text('Recent Transactions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          )),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text('Open Admin Dashboard for full details and filters',
+                      style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
