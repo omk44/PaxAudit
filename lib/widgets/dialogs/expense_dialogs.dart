@@ -33,13 +33,15 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
   @override
   Widget build(BuildContext context) {
     final categoryProvider = Provider.of<CategoryProvider>(context);
-    // Ensure categories are loaded for the selected company before showing form
-    final companyId = Provider.of<AuthProvider>(context, listen: false).companyId;
-    if (categoryProvider.categories.isEmpty && companyId != null && companyId.isNotEmpty) {
-      // fire and forget; UI will rebuild when loaded
-      // ignore: discarded_futures
-      categoryProvider.loadCategoriesForCompany(companyId);
-    }
+    // Ensure categories are loaded after first frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ap = Provider.of<AuthProvider>(context, listen: false);
+      final companyId = ap.companyId ?? ap.selectedCompany?.id;
+      if (categoryProvider.categories.isEmpty && companyId != null && companyId.isNotEmpty) {
+        // ignore: discarded_futures
+        categoryProvider.loadCategoriesForCompany(companyId);
+      }
+    });
     return AlertDialog(
       title: const Text('Add Expense'),
       content: Form(

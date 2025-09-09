@@ -1,10 +1,34 @@
 // screens/placeholder_screens.dart
 import 'package:flutter/material.dart';
+import '../widgets/tax_summary_widget.dart';
 
 class TaxSummaryScreen extends StatelessWidget {
   const TaxSummaryScreen({super.key});
   @override
-  Widget build(BuildContext context) => const _PlaceholderScreen('Tax Summary');
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.receipt_long_rounded),
+            SizedBox(width: 8),
+            Text('Tax Summary'),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              TaxSummaryWidget(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class BankStatementsScreen extends StatelessWidget {

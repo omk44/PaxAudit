@@ -120,11 +120,15 @@ class IncomeEditDialog extends StatefulWidget {
 class _IncomeEditDialogState extends State<IncomeEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late double _amount;
+  late String _description;
+  late String _category;
 
   @override
   void initState() {
     super.initState();
     _amount = widget.income.amount;
+    _description = widget.income.description;
+    _category = widget.income.category;
   }
 
   @override
@@ -133,13 +137,31 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
       title: const Text('Edit Income'),
       content: Form(
         key: _formKey,
-        child: TextFormField(
-          initialValue: _amount.toString(),
-          decoration: const InputDecoration(labelText: 'Amount'),
-          keyboardType: TextInputType.number,
-          onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
-          validator: (val) =>
-              val == null || val.isEmpty ? 'Enter amount' : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              initialValue: _amount.toString(),
+              decoration: const InputDecoration(labelText: 'Amount'),
+              keyboardType: TextInputType.number,
+              onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
+              validator: (val) => val == null || val.isEmpty ? 'Enter amount' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              initialValue: _description,
+              decoration: const InputDecoration(labelText: 'Description'),
+              onChanged: (val) => _description = val,
+              validator: (val) => val == null || val.isEmpty ? 'Enter description' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              initialValue: _category,
+              decoration: const InputDecoration(labelText: 'Category'),
+              onChanged: (val) => _category = val,
+              validator: (val) => val == null || val.isEmpty ? 'Enter category' : null,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -150,10 +172,13 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Provider.of<IncomeProvider>(
-                context,
-                listen: false,
-              ).editIncome(widget.income.id, _amount, widget.editedBy);
+              final updated = widget.income.copyWith(
+                amount: _amount,
+                description: _description,
+                category: _category,
+                addedBy: widget.editedBy,
+              );
+              Provider.of<IncomeProvider>(context, listen: false).updateIncome(updated);
               Navigator.pop(context);
             }
           },
