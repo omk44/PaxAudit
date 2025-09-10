@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'expense.dart';
 
 class IncomeEditHistory {
   final double amount;
@@ -6,7 +7,7 @@ class IncomeEditHistory {
   final String category;
   final String editedBy;
   final DateTime timestamp;
-  
+
   IncomeEditHistory({
     required this.amount,
     required this.description,
@@ -45,7 +46,9 @@ class Income {
   String addedBy;
   List<IncomeEditHistory> history;
   String companyId; // To separate income by company
-  
+  PaymentMethod paymentMethod;
+  String? transactionId;
+
   Income({
     required this.id,
     required this.amount,
@@ -55,6 +58,8 @@ class Income {
     required this.addedBy,
     required this.history,
     required this.companyId,
+    this.paymentMethod = PaymentMethod.cash,
+    this.transactionId,
   });
 
   factory Income.fromFirestore(DocumentSnapshot doc) {
@@ -70,6 +75,11 @@ class Income {
           .map((h) => IncomeEditHistory.fromMap(h as Map<String, dynamic>))
           .toList(),
       companyId: data['companyId'] ?? '',
+      paymentMethod: PaymentMethod.values.firstWhere(
+        (e) => e.name == data['paymentMethod'],
+        orElse: () => PaymentMethod.cash,
+      ),
+      transactionId: data['transactionId'],
     );
   }
 
@@ -82,6 +92,8 @@ class Income {
       'addedBy': addedBy,
       'history': history.map((h) => h.toMap()).toList(),
       'companyId': companyId,
+      'paymentMethod': paymentMethod.name,
+      'transactionId': transactionId,
     };
   }
 
@@ -93,6 +105,8 @@ class Income {
     String? addedBy,
     List<IncomeEditHistory>? history,
     String? companyId,
+    PaymentMethod? paymentMethod,
+    String? transactionId,
   }) {
     return Income(
       id: id,
@@ -103,6 +117,8 @@ class Income {
       addedBy: addedBy ?? this.addedBy,
       history: history ?? this.history,
       companyId: companyId ?? this.companyId,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      transactionId: transactionId ?? this.transactionId,
     );
   }
 }

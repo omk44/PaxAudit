@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"pax-audit","appId":"1:313068119558:android:e8b3b91e0be1accdd40587","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"pax-audit","configurations":{"android":"1:313068119558:android:e8b3b91e0be1accdd40587","web":"1:313068119558:web:788775600bd3f61cd40587"}}}}}}
+{
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "pax-audit",
+                    "appId": "1:313068119558:android:e8b3b91e0be1accdd40587",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "pax-audit",
+                    "configurations": {
+                        "android": "1:313068119558:android:e8b3b91e0be1accdd40587",
+                        "web": "1:313068119558:web:788775600bd3f61cd40587"
+                    }
+                }
+            }
+        }
+    }
+}

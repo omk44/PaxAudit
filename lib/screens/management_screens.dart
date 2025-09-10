@@ -118,7 +118,8 @@ class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
 
   @override
-  State<CategoryManagementScreen> createState() => _CategoryManagementScreenState();
+  State<CategoryManagementScreen> createState() =>
+      _CategoryManagementScreenState();
 }
 
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
@@ -133,8 +134,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         final ap = Provider.of<AuthProvider>(context, listen: false);
         final cid = ap.companyId ?? ap.selectedCompany?.id;
         if (cid != null && cid.isNotEmpty) {
-          await Provider.of<CategoryProvider>(context, listen: false)
-              .loadCategoriesForCompany(cid);
+          await Provider.of<CategoryProvider>(
+            context,
+            listen: false,
+          ).loadCategoriesForCompany(cid);
         }
       });
     }
@@ -163,12 +166,16 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 return ListTile(
                   leading: const Icon(Icons.label_outline_rounded),
                   title: Text(cat.name),
-                  subtitle: Text('GST: ${cat.gstPercentage.toStringAsFixed(2)}%  •  ID: ${cat.id}'),
+                  subtitle: Text(
+                    'GST: ${cat.gstPercentage.toStringAsFixed(2)}%  •  ID: ${cat.id}',
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline_rounded),
                     onPressed: () async {
-                      await Provider.of<CategoryProvider>(context, listen: false)
-                          .deleteCategory(cat.id);
+                      await Provider.of<CategoryProvider>(
+                        context,
+                        listen: false,
+                      ).deleteCategory(cat.id);
                     },
                   ),
                 );
@@ -185,10 +192,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
                 showDialog(
                   context: context,
-                  builder: (_) => CategoryAddDialog(
-                    editedBy: 'admin',
-                    companyId: cid,
-                  ),
+                  builder: (_) =>
+                      CategoryAddDialog(editedBy: 'admin', companyId: cid),
                 );
               },
             ),
@@ -219,8 +224,10 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
-          await Provider.of<IncomeProvider>(context, listen: false)
-              .loadIncomesForCompany(companyId);
+          await Provider.of<IncomeProvider>(
+            context,
+            listen: false,
+          ).loadIncomesForCompany(companyId);
         }
       });
     }
@@ -249,10 +256,8 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
           final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
           showDialog(
             context: context,
-            builder: (_) => IncomeAddDialog(
-              addedBy: auth.role ?? 'admin',
-              companyId: cid,
-            ),
+            builder: (_) =>
+                IncomeAddDialog(addedBy: auth.role ?? 'admin', companyId: cid),
           );
         },
         icon: const Icon(Icons.add),
@@ -271,7 +276,7 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
                           'Amount: ₹${inc.amount.toStringAsFixed(2)}',
                         ),
                         subtitle: Text(
-                          'Date: ${dt.format(inc.date.toLocal())}',
+                          'Date: ${dt.format(inc.date.toLocal())}\nAdded by: ${inc.addedBy}',
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -316,7 +321,10 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: () {
-                      final ap = Provider.of<AuthProvider>(context, listen: false);
+                      final ap = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
                       final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
                       showDialog(
                         context: context,
@@ -341,7 +349,8 @@ class ExpenseManagementScreen extends StatefulWidget {
   const ExpenseManagementScreen({super.key});
 
   @override
-  State<ExpenseManagementScreen> createState() => _ExpenseManagementScreenState();
+  State<ExpenseManagementScreen> createState() =>
+      _ExpenseManagementScreenState();
 }
 
 class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
@@ -356,10 +365,14 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
-          await Provider.of<ExpenseProvider>(context, listen: false)
-              .loadExpensesForCompany(companyId);
-          await Provider.of<CategoryProvider>(context, listen: false)
-              .loadCategoriesForCompany(companyId);
+          await Provider.of<ExpenseProvider>(
+            context,
+            listen: false,
+          ).loadExpensesForCompany(companyId);
+          await Provider.of<CategoryProvider>(
+            context,
+            listen: false,
+          ).loadCategoriesForCompany(companyId);
         }
       });
     }
@@ -389,10 +402,8 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
           final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
           showDialog(
             context: context,
-            builder: (_) => ExpenseAddDialog(
-              addedBy: auth.role ?? 'admin',
-              companyId: cid,
-            ),
+            builder: (_) =>
+                ExpenseAddDialog(addedBy: auth.role ?? 'admin', companyId: cid),
           );
         },
         icon: const Icon(Icons.add),
@@ -425,7 +436,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
                           'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
                         ),
                         subtitle: Text(
-                          'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${dt.format(exp.date.toLocal())}',
+                          'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${dt.format(exp.date.toLocal())}\nAdded by: ${exp.addedBy}',
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -472,7 +483,10 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: () {
-                      final ap = Provider.of<AuthProvider>(context, listen: false);
+                      final ap = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
                       final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
                       showDialog(
                         context: context,
@@ -556,7 +570,9 @@ class _IncomeExpenseManagerScreenState
 
     final incomes = allIncomes; // no bank filter for incomes
     final expenses = allExpenses
-        .where((e) => _bankFilter == 'All' || e.paymentMethod.name == _bankFilter)
+        .where(
+          (e) => _bankFilter == 'All' || e.paymentMethod.name == _bankFilter,
+        )
         .toList();
 
     return Scaffold(
@@ -683,7 +699,9 @@ class _IncomeExpenseManagerScreenState
                 ...incomes.map(
                   (inc) => ListTile(
                     title: Text('Amount: ₹${inc.amount.toStringAsFixed(2)}'),
-                    subtitle: Text('Date: ${_formatDate(inc.date)}'),
+                    subtitle: Text(
+                      'Date: ${_formatDate(inc.date)}\nAdded by: ${inc.addedBy}',
+                    ),
                     onTap: () => showDialog(
                       context: context,
                       builder: (_) => IncomeHistoryDialog(income: inc),
@@ -717,7 +735,7 @@ class _IncomeExpenseManagerScreenState
                       'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
                     ),
                     subtitle: Text(
-                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${_formatDate(exp.date)}',
+                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${_formatDate(exp.date)}\nAdded by: ${exp.addedBy}',
                     ),
                     onTap: () => showDialog(
                       context: context,

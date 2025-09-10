@@ -4,12 +4,17 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/income_provider.dart';
 import '../../models/income.dart';
+import '../../models/expense.dart';
 
 // --- Add Income Dialog ---
 class IncomeAddDialog extends StatefulWidget {
   final String addedBy;
   final String companyId;
-  const IncomeAddDialog({required this.addedBy, required this.companyId, super.key});
+  const IncomeAddDialog({
+    required this.addedBy,
+    required this.companyId,
+    super.key,
+  });
 
   @override
   State<IncomeAddDialog> createState() => _IncomeAddDialogState();
@@ -19,8 +24,15 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
   final _formKey = GlobalKey<FormState>();
   double _amount = 0.0;
   String _description = '';
-  String _category = '';
   DateTime _date = DateTime.now();
+  PaymentMethod _paymentMethod = PaymentMethod.cash;
+  String _transactionId = '';
+
+  bool _isValidAmount(String v) =>
+      RegExp(r'^(?:\d+)(?:\.\d{1,2})?$').hasMatch(v);
+
+  bool _needsTransactionId(PaymentMethod method) =>
+      method != PaymentMethod.cash;
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +45,18 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
           children: [
             TextFormField(
               decoration: const InputDecoration(labelText: 'Amount'),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
-              validator: (val) =>
-                  val == null || val.isEmpty ? 'Enter amount' : null,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Enter amount';
+                if (!_isValidAmount(val))
+                  return 'Amount must be digits (max 2 decimals)';
+                if ((double.tryParse(val) ?? 0) <= 0)
+                  return 'Amount must be greater than 0';
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -46,12 +66,44 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
                   val == null || val.isEmpty ? 'Enter description' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Category'),
-              onChanged: (val) => _category = val,
-              validator: (val) =>
-                  val == null || val.isEmpty ? 'Enter category' : null,
+            DropdownButtonFormField<PaymentMethod>(
+              value: _paymentMethod,
+              items: PaymentMethod.values
+                  .map(
+                    (method) => DropdownMenuItem(
+                      value: method,
+                      child: Text('${method.icon} ${method.displayName}'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (val) =>
+                  setState(() => _paymentMethod = val ?? PaymentMethod.cash),
+              decoration: const InputDecoration(labelText: 'Payment Method'),
+              validator: (val) => val == null ? 'Select payment method' : null,
             ),
+            if (_needsTransactionId(_paymentMethod)) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Transaction/UPI ID (12+ chars)',
+                ),
+                onChanged: (v) => _transactionId = v.trim(),
+                validator: (val) {
+                  if (!_needsTransactionId(_paymentMethod)) return null;
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Enter transaction/UPI ID';
+                  }
+                  if (val.trim().length < 12) {
+                    return 'Must be at least 12 characters';
+                  }
+                  if (!RegExp(r'^[A-Za-z0-9\-_.@]+$').hasMatch(val.trim())) {
+                    return 'Only letters, digits and - _ . @ allowed';
+                  }
+                  return null;
+                },
+              ),
+            ],
+            const SizedBox(height: 16),
             TextFormField(
               decoration: const InputDecoration(labelText: 'Date'),
               readOnly: true,
@@ -83,16 +135,22 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Provider.of<IncomeProvider>(context, listen: false).addIncome(Income(
-                id: '',
-                amount: _amount,
-                description: _description,
-                category: _category,
-                date: _date,
-                addedBy: widget.addedBy,
-                history: [],
-                companyId: widget.companyId,
-              ));
+              Provider.of<IncomeProvider>(context, listen: false).addIncome(
+                Income(
+                  id: '',
+                  amount: _amount,
+                  description: _description,
+                  category: '',
+                  date: _date,
+                  addedBy: widget.addedBy,
+                  history: [],
+                  companyId: widget.companyId,
+                  paymentMethod: _paymentMethod,
+                  transactionId: _needsTransactionId(_paymentMethod)
+                      ? _transactionId
+                      : null,
+                ),
+              );
               Navigator.pop(context);
             }
           },
@@ -121,14 +179,22 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late double _amount;
   late String _description;
-  late String _category;
+  late PaymentMethod _paymentMethod;
+  late String _transactionId;
+
+  bool _isValidAmount(String v) =>
+      RegExp(r'^(?:\d+)(?:\.\d{1,2})?$').hasMatch(v);
+
+  bool _needsTransactionId(PaymentMethod method) =>
+      method != PaymentMethod.cash;
 
   @override
   void initState() {
     super.initState();
     _amount = widget.income.amount;
     _description = widget.income.description;
-    _category = widget.income.category;
+    _paymentMethod = widget.income.paymentMethod;
+    _transactionId = widget.income.transactionId ?? '';
   }
 
   @override
@@ -143,24 +209,66 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
             TextFormField(
               initialValue: _amount.toString(),
               decoration: const InputDecoration(labelText: 'Amount'),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (val) => _amount = double.tryParse(val) ?? 0.0,
-              validator: (val) => val == null || val.isEmpty ? 'Enter amount' : null,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Enter amount';
+                if (!_isValidAmount(val))
+                  return 'Amount must be digits (max 2 decimals)';
+                if ((double.tryParse(val) ?? 0) <= 0)
+                  return 'Amount must be greater than 0';
+                return null;
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
               initialValue: _description,
               decoration: const InputDecoration(labelText: 'Description'),
               onChanged: (val) => _description = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter description' : null,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Enter description' : null,
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              onChanged: (val) => _category = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter category' : null,
+            DropdownButtonFormField<PaymentMethod>(
+              value: _paymentMethod,
+              items: PaymentMethod.values
+                  .map(
+                    (method) => DropdownMenuItem(
+                      value: method,
+                      child: Text('${method.icon} ${method.displayName}'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (val) =>
+                  setState(() => _paymentMethod = val ?? PaymentMethod.cash),
+              decoration: const InputDecoration(labelText: 'Payment Method'),
+              validator: (val) => val == null ? 'Select payment method' : null,
             ),
+            if (_needsTransactionId(_paymentMethod)) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: _transactionId,
+                decoration: const InputDecoration(
+                  labelText: 'Transaction/UPI ID (12+ chars)',
+                ),
+                onChanged: (v) => _transactionId = v.trim(),
+                validator: (val) {
+                  if (!_needsTransactionId(_paymentMethod)) return null;
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Enter transaction/UPI ID';
+                  }
+                  if (val.trim().length < 12) {
+                    return 'Must be at least 12 characters';
+                  }
+                  if (!RegExp(r'^[A-Za-z0-9\-_.@]+$').hasMatch(val.trim())) {
+                    return 'Only letters, digits and - _ . @ allowed';
+                  }
+                  return null;
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -175,12 +283,16 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
               final updated = widget.income.copyWith(
                 amount: _amount,
                 description: _description,
-                category: _category,
+                category: '',
+                paymentMethod: _paymentMethod,
+                transactionId: _needsTransactionId(_paymentMethod)
+                    ? _transactionId
+                    : null,
               );
-              Provider.of<IncomeProvider>(context, listen: false).updateIncome(
-                updated,
-                editedBy: widget.editedBy,
-              );
+              Provider.of<IncomeProvider>(
+                context,
+                listen: false,
+              ).updateIncome(updated, editedBy: widget.editedBy);
               Navigator.pop(context);
             }
           },

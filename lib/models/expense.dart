@@ -1,13 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PaymentMethod {
-  cash,
-  sbi,
-  hdfc,
-  icici,
-  axis,
-  kotak,
-}
+enum PaymentMethod { cash, sbi, hdfc, icici, axis, kotak }
 
 extension PaymentMethodExtension on PaymentMethod {
   String get displayName {
@@ -54,7 +47,7 @@ class ExpenseEditHistory {
   final PaymentMethod paymentMethod;
   final String editedBy;
   final DateTime timestamp;
-  
+
   ExpenseEditHistory({
     required this.amount,
     required this.gstPercentage,
@@ -110,7 +103,8 @@ class Expense {
   PaymentMethod paymentMethod;
   List<ExpenseEditHistory> history;
   String companyId; // To separate expenses by company
-  
+  String? transactionId;
+
   Expense({
     required this.id,
     required this.categoryId,
@@ -125,10 +119,11 @@ class Expense {
     required this.paymentMethod,
     required this.history,
     required this.companyId,
+    this.transactionId,
   });
 
   double get totalAmount => amount + gstAmount;
-  
+
   factory Expense.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Expense(
@@ -150,6 +145,7 @@ class Expense {
           .map((h) => ExpenseEditHistory.fromMap(h as Map<String, dynamic>))
           .toList(),
       companyId: data['companyId'] ?? '',
+      transactionId: data['transactionId'],
     );
   }
 
@@ -167,6 +163,7 @@ class Expense {
       'paymentMethod': paymentMethod.name,
       'history': history.map((h) => h.toMap()).toList(),
       'companyId': companyId,
+      'transactionId': transactionId,
     };
   }
 
@@ -183,6 +180,7 @@ class Expense {
     PaymentMethod? paymentMethod,
     List<ExpenseEditHistory>? history,
     String? companyId,
+    String? transactionId,
   }) {
     return Expense(
       id: id,
@@ -198,6 +196,7 @@ class Expense {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       history: history ?? this.history,
       companyId: companyId ?? this.companyId,
+      transactionId: transactionId ?? this.transactionId,
     );
   }
 }

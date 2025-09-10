@@ -30,7 +30,7 @@ class _CADashboardState extends State<CADashboard> {
     // Reload data if company changes
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final currentCompanyId = auth.companyId ?? auth.selectedCompany?.id;
-    
+
     if (currentCompanyId != null && currentCompanyId != _lastLoadedCompanyId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadData();
@@ -41,18 +41,24 @@ class _CADashboardState extends State<CADashboard> {
   Future<void> _loadData() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final companyId = auth.companyId ?? auth.selectedCompany?.id;
-    
+
     if (companyId != null && companyId != _lastLoadedCompanyId) {
       // Load all necessary data for the dashboard
       await Future.wait([
-        Provider.of<ExpenseProvider>(context, listen: false)
-            .loadExpensesForCompany(companyId),
-        Provider.of<IncomeProvider>(context, listen: false)
-            .loadIncomesForCompany(companyId),
-        Provider.of<CategoryProvider>(context, listen: false)
-            .loadCategoriesForCompany(companyId),
+        Provider.of<ExpenseProvider>(
+          context,
+          listen: false,
+        ).loadExpensesForCompany(companyId),
+        Provider.of<IncomeProvider>(
+          context,
+          listen: false,
+        ).loadIncomesForCompany(companyId),
+        Provider.of<CategoryProvider>(
+          context,
+          listen: false,
+        ).loadCategoriesForCompany(companyId),
       ]);
-      
+
       _lastLoadedCompanyId = companyId;
     }
   }
@@ -75,38 +81,67 @@ class _CADashboardState extends State<CADashboard> {
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
-            return const Center(
-              child: Text('No company selected'),
-            );
+            return const Center(child: Text('No company selected'));
           }
-          
+
           return ListView(
             children: [
               ListTile(
+                leading: const Icon(Icons.badge_rounded, color: Colors.blue),
                 title: const Text('CA Details'),
+                subtitle: const Text('View your profile and linked company'),
                 onTap: () => Navigator.pushNamed(context, '/ca_details'),
               ),
+              const Divider(),
               ListTile(
+                leading: const Icon(
+                  Icons.monitor_heart_rounded,
+                  color: Colors.teal,
+                ),
                 title: const Text('Income/Expense Viewer'),
+                subtitle: const Text('Overview with filters and summaries'),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const IncomeExpenseManagerScreen(),
+                  ),
                 ),
               ),
               ListTile(
+                leading: const Icon(
+                  Icons.trending_up_rounded,
+                  color: Colors.green,
+                ),
                 title: const Text('Income Management'),
+                subtitle: const Text('Add and edit incomes'),
                 onTap: () => Navigator.pushNamed(context, '/income_management'),
               ),
               ListTile(
+                leading: const Icon(
+                  Icons.trending_down_rounded,
+                  color: Colors.red,
+                ),
                 title: const Text('Expense Management'),
-                onTap: () => Navigator.pushNamed(context, '/expense_management'),
+                subtitle: const Text('Add and edit expenses with GST'),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/expense_management'),
               ),
               ListTile(
+                leading: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Colors.indigo,
+                ),
                 title: const Text('Tax Summary'),
+                subtitle: const Text('GST summary and totals'),
                 onTap: () => Navigator.pushNamed(context, '/tax_summary'),
               ),
               ListTile(
+                leading: const Icon(
+                  Icons.account_balance_rounded,
+                  color: Colors.brown,
+                ),
                 title: const Text('Bank Statements'),
+                subtitle: const Text('View uploaded bank statements'),
                 onTap: () => Navigator.pushNamed(context, '/bank_statements'),
               ),
             ],
