@@ -337,8 +337,7 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Provider.of<ExpenseProvider>(context, listen: false).editExpense(
-                widget.expense.copyWith(
+              final updatedExpense = widget.expense.copyWith(
                   categoryId: _categoryId,
                   categoryName: categoryProvider.categories
                       .firstWhere(
@@ -354,9 +353,11 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                   invoiceNumber: _invoiceNumber,
                   description: _description,
                   date: _date,
-                  addedBy: widget.editedBy,
                   paymentMethod: _paymentMethod,
-                ),
+              );
+              Provider.of<ExpenseProvider>(context, listen: false).editExpense(
+                updatedExpense,
+                editedBy: widget.editedBy,
               );
               Navigator.pop(context);
             }

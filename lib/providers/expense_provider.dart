@@ -84,26 +84,32 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   // Update an expense
-  Future<bool> updateExpense(Expense expense) async {
+  Future<bool> updateExpense(Expense expense, {required String editedBy}) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
+      // Preserve original creator if present in local cache
+      final existingIndex = _expenses.indexWhere((e) => e.id == expense.id);
+      final preserved = existingIndex == -1
+          ? expense
+          : expense.copyWith(addedBy: _expenses[existingIndex].addedBy);
+
       // Append edit history entry before update
-      final updatedHistory = List<ExpenseEditHistory>.from(expense.history)
+      final updatedHistory = List<ExpenseEditHistory>.from(preserved.history)
         ..add(ExpenseEditHistory(
-          amount: expense.amount,
-          gstPercentage: expense.gstPercentage,
-          gstAmount: expense.gstAmount,
-          invoiceNumber: expense.invoiceNumber,
-          description: expense.description,
-          paymentMethod: expense.paymentMethod,
-          editedBy: expense.addedBy,
+          amount: preserved.amount,
+          gstPercentage: preserved.gstPercentage,
+          gstAmount: preserved.gstAmount,
+          invoiceNumber: preserved.invoiceNumber,
+          description: preserved.description,
+          paymentMethod: preserved.paymentMethod,
+          editedBy: editedBy,
           timestamp: DateTime.now(),
         ));
 
-      final expenseWithHistory = expense.copyWith(history: updatedHistory);
+      final expenseWithHistory = preserved.copyWith(history: updatedHistory);
 
       await _firestore
           .collection('expenses')
@@ -150,8 +156,8 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   // Edit expense (alias for updateExpense)
-  Future<bool> editExpense(Expense expense) async {
-    return await updateExpense(expense);
+  Future<bool> editExpense(Expense expense, {required String editedBy}) async {
+    return await updateExpense(expense, editedBy: editedBy);
   }
 
   // Get expense by ID
@@ -197,6 +203,14 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  // Clear all expenses (useful for logout)
+  void clearExpenses() {
+    _expenses.clear();
+    _isLoading = false;
     _error = null;
     notifyListeners();
   }
