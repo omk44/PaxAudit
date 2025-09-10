@@ -75,23 +75,29 @@ class IncomeProvider extends ChangeNotifier {
   }
 
   // Update an income
-  Future<bool> updateIncome(Income income) async {
+  Future<bool> updateIncome(Income income, {required String editedBy}) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
+      // Preserve original creator if present in local cache
+      final indexExisting = _incomes.indexWhere((i) => i.id == income.id);
+      final preserved = indexExisting == -1
+          ? income
+          : income.copyWith(addedBy: _incomes[indexExisting].addedBy);
+
       // Append edit history entry before update
-      final updatedHistory = List<IncomeEditHistory>.from(income.history)
+      final updatedHistory = List<IncomeEditHistory>.from(preserved.history)
         ..add(IncomeEditHistory(
-          amount: income.amount,
-          description: income.description,
-          category: income.category,
-          editedBy: income.addedBy,
+          amount: preserved.amount,
+          description: preserved.description,
+          category: preserved.category,
+          editedBy: editedBy,
           timestamp: DateTime.now(),
         ));
 
-      final incomeWithHistory = income.copyWith(history: updatedHistory);
+      final incomeWithHistory = preserved.copyWith(history: updatedHistory);
 
       await _firestore
           .collection('incomes')
@@ -142,10 +148,9 @@ class IncomeProvider extends ChangeNotifier {
     final income = _incomes.firstWhere((i) => i.id == id);
     final updatedIncome = income.copyWith(
       amount: amount,
-      addedBy: editedBy,
     );
-    
-    return await updateIncome(updatedIncome);
+
+    return await updateIncome(updatedIncome, editedBy: editedBy);
   }
 
   // Get income by ID
@@ -176,6 +181,14 @@ class IncomeProvider extends ChangeNotifier {
   }
 
   void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  // Clear all incomes (useful for logout)
+  void clearIncomes() {
+    _incomes.clear();
+    _isLoading = false;
     _error = null;
     notifyListeners();
   }

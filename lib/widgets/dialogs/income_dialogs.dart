@@ -176,9 +176,11 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
                 amount: _amount,
                 description: _description,
                 category: _category,
-                addedBy: widget.editedBy,
               );
-              Provider.of<IncomeProvider>(context, listen: false).updateIncome(updated);
+              Provider.of<IncomeProvider>(context, listen: false).updateIncome(
+                updated,
+                editedBy: widget.editedBy,
+              );
               Navigator.pop(context);
             }
           },
