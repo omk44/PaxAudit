@@ -44,6 +44,7 @@ dependencies:
   cloud_firestore: ^6.0.0
   firebase_analytics: ^12.0.0
   firebase_storage: ^13.0.0
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:

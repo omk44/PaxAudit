@@ -143,4 +143,65 @@ class CategoryProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  // Seed default Indian GST categories (static list) for a company
+  // Does not duplicate existing category names (case-insensitive match)
+  Future<void> seedDefaultIndianCategories({
+    required String companyId,
+    required String editedBy,
+  }) async {
+    final defaults = <Map<String, dynamic>>[
+      // Zero rated / exempt
+      {'name': 'Unprocessed Food Grains', 'gst': 0.0},
+      {'name': 'Fresh Vegetables & Fruits', 'gst': 0.0},
+      {'name': 'Education Services (Exempt)', 'gst': 0.0},
+      {'name': 'Healthcare Services (Exempt)', 'gst': 0.0},
+      // 5%
+      {'name': 'Essential Medicines', 'gst': 5.0},
+      {'name': 'Household Essentials (select)', 'gst': 5.0},
+      // 12%
+      {'name': 'Processed Foods', 'gst': 12.0},
+      {'name': 'Computers & Peripherals', 'gst': 12.0},
+      // 18%
+      {'name': 'Professional Services', 'gst': 18.0},
+      {'name': 'Software/SaaS Services', 'gst': 18.0},
+      {'name': 'Electronics & Appliances', 'gst': 18.0},
+      // 28%
+      {'name': 'Luxury Goods', 'gst': 28.0},
+      {'name': 'Automobiles (select)', 'gst': 28.0},
+    ];
+
+    // Existing names (lowercase) for quick lookup
+    final existingNames = _categories
+        .where((c) => c.companyId == companyId)
+        .map((c) => c.name.trim().toLowerCase())
+        .toSet();
+
+    // Create missing ones
+    for (final item in defaults) {
+      final name = (item['name'] as String).trim();
+      final key = name.toLowerCase();
+      if (existingNames.contains(key)) continue;
+
+      final category = Category(
+        id: '',
+        name: name,
+        gstPercentage: (item['gst'] as num).toDouble(),
+        lastEditedBy: editedBy,
+        lastEditedAt: DateTime.now(),
+        history: [
+          CategoryEditHistory(
+            editedBy: editedBy,
+            timestamp: DateTime.now(),
+            name: name,
+            gstPercentage: (item['gst'] as num).toDouble(),
+          ),
+        ],
+        companyId: companyId,
+      );
+
+      // ignore: discarded_futures
+      await addCategory(category);
+    }
+  }
 }

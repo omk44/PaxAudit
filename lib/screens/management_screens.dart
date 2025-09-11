@@ -155,6 +155,27 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             Text('Category Management'),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Seed Indian GST categories',
+            icon: const Icon(Icons.auto_awesome_rounded),
+            onPressed: () async {
+              final ap = Provider.of<AuthProvider>(context, listen: false);
+              final cid = ap.companyId ?? ap.selectedCompany?.id;
+              if (cid == null || cid.isEmpty) return;
+              await Provider.of<CategoryProvider>(context, listen: false).seedDefaultIndianCategories(
+                companyId: cid,
+                editedBy: ap.role ?? 'admin',
+              );
+              if (mounted) {
+                await Provider.of<CategoryProvider>(context, listen: false).loadCategoriesForCompany(cid);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Seeded default Indian GST categories')),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
