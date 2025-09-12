@@ -4,7 +4,7 @@ import '../models/expense.dart';
 
 class ExpenseProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   final List<Expense> _expenses = [];
   bool _isLoading = false;
   String? _error;
@@ -12,16 +12,19 @@ class ExpenseProvider extends ChangeNotifier {
   List<Expense> get expenses => List.unmodifiable(_expenses);
   bool get isLoading => _isLoading;
   String? get error => _error;
-  
+
   // Calculate total expense amount
-  double get totalExpense => _expenses.fold(0.0, (sum, expense) => sum + expense.amount);
-  
+  double get totalExpense =>
+      _expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+
   // Calculate total GST paid
-  double get totalGst => _expenses.fold(0.0, (sum, expense) => sum + expense.gstAmount);
+  double get totalGst =>
+      _expenses.fold(0.0, (sum, expense) => sum + expense.gstAmount);
 
   // Load expenses for a specific company
   Future<void> loadExpensesForCompany(String companyId) async {
     try {
+      print('Loading expenses for company: $companyId');
       _isLoading = true;
       _error = null;
       notifyListeners();
@@ -32,12 +35,16 @@ class ExpenseProvider extends ChangeNotifier {
           .orderBy('date', descending: true)
           .get();
 
+      print(
+        'Found ${snapshot.docs.length} expense records for company $companyId',
+      );
       _expenses.clear();
       _expenses.addAll(snapshot.docs.map((doc) => Expense.fromFirestore(doc)));
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      print('Error loading expenses for company $companyId: $e');
       _error = 'Failed to load expenses: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
@@ -51,26 +58,33 @@ class ExpenseProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final docRef = await _firestore.collection('expenses').add(expense.toFirestore());
+      final docRef = await _firestore
+          .collection('expenses')
+          .add(expense.toFirestore());
 
       // Add to local list with the generated ID
-      final createdExpense = expense.copyWith().copyWith(companyId: expense.companyId);
+      final createdExpense = expense.copyWith().copyWith(
+        companyId: expense.companyId,
+      );
       // Ensure the created expense carries the Firestore-generated id
-      _expenses.insert(0, Expense(
-        id: docRef.id,
-        categoryId: createdExpense.categoryId,
-        categoryName: createdExpense.categoryName,
-        amount: createdExpense.amount,
-        gstPercentage: createdExpense.gstPercentage,
-        gstAmount: createdExpense.gstAmount,
-        invoiceNumber: createdExpense.invoiceNumber,
-        description: createdExpense.description,
-        date: createdExpense.date,
-        addedBy: createdExpense.addedBy,
-        paymentMethod: createdExpense.paymentMethod,
-        history: createdExpense.history,
-        companyId: createdExpense.companyId,
-      )); // Insert at beginning for recent first
+      _expenses.insert(
+        0,
+        Expense(
+          id: docRef.id,
+          categoryId: createdExpense.categoryId,
+          categoryName: createdExpense.categoryName,
+          amount: createdExpense.amount,
+          gstPercentage: createdExpense.gstPercentage,
+          gstAmount: createdExpense.gstAmount,
+          invoiceNumber: createdExpense.invoiceNumber,
+          description: createdExpense.description,
+          date: createdExpense.date,
+          addedBy: createdExpense.addedBy,
+          paymentMethod: createdExpense.paymentMethod,
+          history: createdExpense.history,
+          companyId: createdExpense.companyId,
+        ),
+      ); // Insert at beginning for recent first
 
       _isLoading = false;
       notifyListeners();
@@ -84,7 +98,10 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   // Update an expense
-  Future<bool> updateExpense(Expense expense, {required String editedBy}) async {
+  Future<bool> updateExpense(
+    Expense expense, {
+    required String editedBy,
+  }) async {
     try {
       _isLoading = true;
       _error = null;
@@ -98,16 +115,18 @@ class ExpenseProvider extends ChangeNotifier {
 
       // Append edit history entry before update
       final updatedHistory = List<ExpenseEditHistory>.from(preserved.history)
-        ..add(ExpenseEditHistory(
-          amount: preserved.amount,
-          gstPercentage: preserved.gstPercentage,
-          gstAmount: preserved.gstAmount,
-          invoiceNumber: preserved.invoiceNumber,
-          description: preserved.description,
-          paymentMethod: preserved.paymentMethod,
-          editedBy: editedBy,
-          timestamp: DateTime.now(),
-        ));
+        ..add(
+          ExpenseEditHistory(
+            amount: preserved.amount,
+            gstPercentage: preserved.gstPercentage,
+            gstAmount: preserved.gstAmount,
+            invoiceNumber: preserved.invoiceNumber,
+            description: preserved.description,
+            paymentMethod: preserved.paymentMethod,
+            editedBy: editedBy,
+            timestamp: DateTime.now(),
+          ),
+        );
 
       final expenseWithHistory = preserved.copyWith(history: updatedHistory);
 
@@ -141,7 +160,7 @@ class ExpenseProvider extends ChangeNotifier {
       notifyListeners();
 
       await _firestore.collection('expenses').doc(id).delete();
-      
+
       _expenses.removeWhere((e) => e.id == id);
 
       _isLoading = false;
@@ -196,10 +215,13 @@ class ExpenseProvider extends ChangeNotifier {
 
   // Get expenses by date range
   List<Expense> getExpensesByDateRange(DateTime startDate, DateTime endDate) {
-    return _expenses.where((e) => 
-      e.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
-      e.date.isBefore(endDate.add(const Duration(days: 1)))
-    ).toList();
+    return _expenses
+        .where(
+          (e) =>
+              e.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
+              e.date.isBefore(endDate.add(const Duration(days: 1))),
+        )
+        .toList();
   }
 
   void clearError() {
@@ -207,8 +229,18 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear all expenses (useful for logout)
+  // Clear all expenses (useful for logout or company switch)
   void clearExpenses() {
+    print('Clearing all expense data');
+    _expenses.clear();
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+  }
+
+  // Clear expenses for company switch
+  void clearExpensesForCompanySwitch() {
+    print('Clearing expense data for company switch');
     _expenses.clear();
     _isLoading = false;
     _error = null;

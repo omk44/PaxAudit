@@ -163,14 +163,22 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               final ap = Provider.of<AuthProvider>(context, listen: false);
               final cid = ap.companyId ?? ap.selectedCompany?.id;
               if (cid == null || cid.isEmpty) return;
-              await Provider.of<CategoryProvider>(context, listen: false).seedDefaultIndianCategories(
+              await Provider.of<CategoryProvider>(
+                context,
+                listen: false,
+              ).seedDefaultIndianCategories(
                 companyId: cid,
                 editedBy: ap.role ?? 'admin',
               );
               if (mounted) {
-                await Provider.of<CategoryProvider>(context, listen: false).loadCategoriesForCompany(cid);
+                await Provider.of<CategoryProvider>(
+                  context,
+                  listen: false,
+                ).loadCategoriesForCompany(cid);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Seeded default Indian GST categories')),
+                  const SnackBar(
+                    content: Text('Seeded default Indian GST categories'),
+                  ),
                 );
               }
             },
@@ -245,6 +253,11 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
+          // Clear existing data first to prevent cross-company data leakage
+          Provider.of<IncomeProvider>(
+            context,
+            listen: false,
+          ).clearIncomesForCompanySwitch();
           await Provider.of<IncomeProvider>(
             context,
             listen: false,
@@ -386,6 +399,11 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
+          // Clear existing data first to prevent cross-company data leakage
+          Provider.of<ExpenseProvider>(
+            context,
+            listen: false,
+          ).clearExpensesForCompanySwitch();
           await Provider.of<ExpenseProvider>(
             context,
             listen: false,

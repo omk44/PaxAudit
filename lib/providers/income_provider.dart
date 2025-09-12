@@ -4,7 +4,7 @@ import '../models/income.dart';
 
 class IncomeProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   final List<Income> _incomes = [];
   bool _isLoading = false;
   String? _error;
@@ -12,13 +12,15 @@ class IncomeProvider extends ChangeNotifier {
   List<Income> get incomes => List.unmodifiable(_incomes);
   bool get isLoading => _isLoading;
   String? get error => _error;
-  
+
   // Calculate total income amount
-  double get totalIncome => _incomes.fold(0.0, (sum, income) => sum + income.amount);
+  double get totalIncome =>
+      _incomes.fold(0.0, (sum, income) => sum + income.amount);
 
   // Load incomes for a specific company
   Future<void> loadIncomesForCompany(String companyId) async {
     try {
+      print('Loading incomes for company: $companyId');
       _isLoading = true;
       _error = null;
       notifyListeners();
@@ -29,12 +31,16 @@ class IncomeProvider extends ChangeNotifier {
           .orderBy('date', descending: true)
           .get();
 
+      print(
+        'Found ${snapshot.docs.length} income records for company $companyId',
+      );
       _incomes.clear();
       _incomes.addAll(snapshot.docs.map((doc) => Income.fromFirestore(doc)));
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      print('Error loading incomes for company $companyId: $e');
       _error = 'Failed to load incomes: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
@@ -48,20 +54,27 @@ class IncomeProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final docRef = await _firestore.collection('incomes').add(income.toFirestore());
+      final docRef = await _firestore
+          .collection('incomes')
+          .add(income.toFirestore());
 
       // Add to local list with the generated ID
       final createdIncome = income.copyWith();
-      _incomes.insert(0, Income(
-        id: docRef.id,
-        amount: createdIncome.amount,
-        description: createdIncome.description,
-        category: createdIncome.category,
-        date: createdIncome.date,
-        addedBy: createdIncome.addedBy,
-        history: createdIncome.history,
-        companyId: createdIncome.companyId,
-      )); // Insert at beginning for recent first
+      _incomes.insert(
+        0,
+        Income(
+          id: docRef.id,
+          amount: createdIncome.amount,
+          description: createdIncome.description,
+          category: createdIncome.category,
+          date: createdIncome.date,
+          addedBy: createdIncome.addedBy,
+          paymentMethod: createdIncome.paymentMethod,
+          transactionId: createdIncome.transactionId,
+          history: createdIncome.history,
+          companyId: createdIncome.companyId,
+        ),
+      ); // Insert at beginning for recent first
 
       _isLoading = false;
       notifyListeners();
@@ -89,13 +102,15 @@ class IncomeProvider extends ChangeNotifier {
 
       // Append edit history entry before update
       final updatedHistory = List<IncomeEditHistory>.from(preserved.history)
-        ..add(IncomeEditHistory(
-          amount: preserved.amount,
-          description: preserved.description,
-          category: preserved.category,
-          editedBy: editedBy,
-          timestamp: DateTime.now(),
-        ));
+        ..add(
+          IncomeEditHistory(
+            amount: preserved.amount,
+            description: preserved.description,
+            category: preserved.category,
+            editedBy: editedBy,
+            timestamp: DateTime.now(),
+          ),
+        );
 
       final incomeWithHistory = preserved.copyWith(history: updatedHistory);
 
@@ -129,7 +144,7 @@ class IncomeProvider extends ChangeNotifier {
       notifyListeners();
 
       await _firestore.collection('incomes').doc(id).delete();
-      
+
       _incomes.removeWhere((i) => i.id == id);
 
       _isLoading = false;
@@ -146,9 +161,7 @@ class IncomeProvider extends ChangeNotifier {
   // Edit income (alias for updateIncome)
   Future<bool> editIncome(String id, double amount, String editedBy) async {
     final income = _incomes.firstWhere((i) => i.id == id);
-    final updatedIncome = income.copyWith(
-      amount: amount,
-    );
+    final updatedIncome = income.copyWith(amount: amount);
 
     return await updateIncome(updatedIncome, editedBy: editedBy);
   }
@@ -174,10 +187,13 @@ class IncomeProvider extends ChangeNotifier {
 
   // Get incomes by date range
   List<Income> getIncomesByDateRange(DateTime startDate, DateTime endDate) {
-    return _incomes.where((i) => 
-      i.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
-      i.date.isBefore(endDate.add(const Duration(days: 1)))
-    ).toList();
+    return _incomes
+        .where(
+          (i) =>
+              i.date.isAfter(startDate.subtract(const Duration(days: 1))) &&
+              i.date.isBefore(endDate.add(const Duration(days: 1))),
+        )
+        .toList();
   }
 
   void clearError() {
@@ -185,8 +201,18 @@ class IncomeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear all incomes (useful for logout)
+  // Clear all incomes (useful for logout or company switch)
   void clearIncomes() {
+    print('Clearing all income data');
+    _incomes.clear();
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+  }
+
+  // Clear incomes for company switch
+  void clearIncomesForCompanySwitch() {
+    print('Clearing income data for company switch');
     _incomes.clear();
     _isLoading = false;
     _error = null;

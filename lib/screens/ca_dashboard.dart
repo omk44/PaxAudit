@@ -43,6 +43,16 @@ class _CADashboardState extends State<CADashboard> {
     final companyId = auth.companyId ?? auth.selectedCompany?.id;
 
     if (companyId != null && companyId != _lastLoadedCompanyId) {
+      // Clear existing data first to prevent cross-company data leakage
+      Provider.of<ExpenseProvider>(
+        context,
+        listen: false,
+      ).clearExpensesForCompanySwitch();
+      Provider.of<IncomeProvider>(
+        context,
+        listen: false,
+      ).clearIncomesForCompanySwitch();
+
       // Load all necessary data for the dashboard
       await Future.wait([
         Provider.of<ExpenseProvider>(

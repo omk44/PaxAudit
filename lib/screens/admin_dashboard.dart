@@ -41,15 +41,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final companyId = auth.companyId ?? auth.selectedCompany?.id;
     if (companyId != null && companyId != _lastLoadedCompanyId) {
+      // Clear existing data first to prevent cross-company data leakage
+      Provider.of<ExpenseProvider>(
+        context,
+        listen: false,
+      ).clearExpensesForCompanySwitch();
+      Provider.of<IncomeProvider>(
+        context,
+        listen: false,
+      ).clearIncomesForCompanySwitch();
+
       await Future.wait([
-        Provider.of<ExpenseProvider>(context, listen: false)
-            .loadExpensesForCompany(companyId),
-        Provider.of<IncomeProvider>(context, listen: false)
-            .loadIncomesForCompany(companyId),
-        Provider.of<CategoryProvider>(context, listen: false)
-            .loadCategoriesForCompany(companyId),
-        Provider.of<CAProvider>(context, listen: false)
-            .loadCAsForCompany(companyId),
+        Provider.of<ExpenseProvider>(
+          context,
+          listen: false,
+        ).loadExpensesForCompany(companyId),
+        Provider.of<IncomeProvider>(
+          context,
+          listen: false,
+        ).loadIncomesForCompany(companyId),
+        Provider.of<CategoryProvider>(
+          context,
+          listen: false,
+        ).loadCategoriesForCompany(companyId),
+        Provider.of<CAProvider>(
+          context,
+          listen: false,
+        ).loadCAsForCompany(companyId),
       ]);
       _lastLoadedCompanyId = companyId;
     }
@@ -73,9 +91,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
-            return const Center(
-              child: Text('No company selected'),
-            );
+            return const Center(child: Text('No company selected'));
           }
           return ListView(
             children: [
@@ -87,43 +103,68 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.people_alt_rounded, color: Colors.green),
+                leading: const Icon(
+                  Icons.people_alt_rounded,
+                  color: Colors.green,
+                ),
                 title: const Text('CA Management'),
                 subtitle: const Text('Manage Chartered Accountants'),
                 onTap: () => Navigator.pushNamed(context, '/ca_management'),
               ),
               ListTile(
-                leading: const Icon(Icons.category_rounded, color: Colors.deepPurple),
+                leading: const Icon(
+                  Icons.category_rounded,
+                  color: Colors.deepPurple,
+                ),
                 title: const Text('Category Management'),
                 subtitle: const Text('Manage expense categories and GST %'),
-                onTap: () => Navigator.pushNamed(context, '/category_management'),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/category_management'),
               ),
               ListTile(
-                leading: const Icon(Icons.monitor_heart_rounded, color: Colors.teal),
+                leading: const Icon(
+                  Icons.monitor_heart_rounded,
+                  color: Colors.teal,
+                ),
                 title: const Text('Income/Expense Viewer'),
                 subtitle: const Text('Overview with filters and summaries'),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const IncomeExpenseManagerScreen(),
+                  ),
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.trending_up_rounded, color: Colors.green),
+                leading: const Icon(
+                  Icons.trending_up_rounded,
+                  color: Colors.green,
+                ),
                 title: const Text('Income Management'),
                 onTap: () => Navigator.pushNamed(context, '/income_management'),
               ),
               ListTile(
-                leading: const Icon(Icons.trending_down_rounded, color: Colors.red),
+                leading: const Icon(
+                  Icons.trending_down_rounded,
+                  color: Colors.red,
+                ),
                 title: const Text('Expense Management'),
-                onTap: () => Navigator.pushNamed(context, '/expense_management'),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/expense_management'),
               ),
               ListTile(
-                leading: const Icon(Icons.receipt_long_rounded, color: Colors.indigo),
+                leading: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: Colors.indigo,
+                ),
                 title: const Text('Tax Summary'),
                 onTap: () => Navigator.pushNamed(context, '/tax_summary'),
               ),
               ListTile(
-                leading: const Icon(Icons.account_balance_rounded, color: Colors.brown),
+                leading: const Icon(
+                  Icons.account_balance_rounded,
+                  color: Colors.brown,
+                ),
                 title: const Text('Bank Statements'),
                 onTap: () => Navigator.pushNamed(context, '/bank_statements'),
               ),

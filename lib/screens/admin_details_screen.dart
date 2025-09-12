@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/company_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/ca_provider.dart';
@@ -28,17 +27,35 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
   Future<void> _loadData() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final company = auth.selectedCompany;
-    
+
     if (company != null) {
+      // Clear existing data first to prevent cross-company data leakage
+      Provider.of<ExpenseProvider>(
+        context,
+        listen: false,
+      ).clearExpensesForCompanySwitch();
+      Provider.of<IncomeProvider>(
+        context,
+        listen: false,
+      ).clearIncomesForCompanySwitch();
+
       // Load expenses and income for the company
-      await Provider.of<ExpenseProvider>(context, listen: false)
-          .loadExpensesForCompany(company.id);
-      await Provider.of<IncomeProvider>(context, listen: false)
-          .loadIncomesForCompany(company.id);
-      await Provider.of<CategoryProvider>(context, listen: false)
-          .loadCategoriesForCompany(company.id);
-      await Provider.of<CAProvider>(context, listen: false)
-          .loadCAsForCompany(company.id);
+      await Provider.of<ExpenseProvider>(
+        context,
+        listen: false,
+      ).loadExpensesForCompany(company.id);
+      await Provider.of<IncomeProvider>(
+        context,
+        listen: false,
+      ).loadIncomesForCompany(company.id);
+      await Provider.of<CategoryProvider>(
+        context,
+        listen: false,
+      ).loadCategoriesForCompany(company.id);
+      await Provider.of<CAProvider>(
+        context,
+        listen: false,
+      ).loadCAsForCompany(company.id);
     }
   }
 
@@ -49,9 +66,7 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
         final company = auth.selectedCompany;
         if (company == null) {
           return const Scaffold(
-            body: Center(
-              child: Text('No company selected'),
-            ),
+            body: Center(child: Text('No company selected')),
           );
         }
 
@@ -145,7 +160,11 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
             ),
             const SizedBox(height: 20),
             if (company.description != null) ...[
-              _buildInfoRow(Icons.description, 'Description', company.description!),
+              _buildInfoRow(
+                Icons.description,
+                'Description',
+                company.description!,
+              ),
               const SizedBox(height: 12),
             ],
             if (company.address != null) ...[
@@ -187,10 +206,7 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
           ),
         ),
       ],
@@ -200,10 +216,14 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
   Widget _buildStatisticsCards() {
     return Consumer2<ExpenseProvider, IncomeProvider>(
       builder: (context, expenseProvider, incomeProvider, child) {
-        final totalExpenses = expenseProvider.expenses
-            .fold(0.0, (sum, expense) => sum + expense.amount);
-        final totalIncome = incomeProvider.incomes
-            .fold(0.0, (sum, income) => sum + income.amount);
+        final totalExpenses = expenseProvider.expenses.fold(
+          0.0,
+          (sum, expense) => sum + expense.amount,
+        );
+        final totalIncome = incomeProvider.incomes.fold(
+          0.0,
+          (sum, income) => sum + income.amount,
+        );
         final netProfit = totalIncome - totalExpenses;
 
         return Row(
@@ -240,7 +260,12 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -280,7 +305,9 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
       builder: (context, caProvider, child) {
         return Card(
           elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -310,62 +337,68 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
                     ),
                   )
                 else
-                  ...caProvider.cas.map((ca) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.blue[100],
-                          child: Text(
-                            ca.name.isNotEmpty ? ca.name[0].toUpperCase() : 'C',
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontWeight: FontWeight.bold,
+                  ...caProvider.cas.map(
+                    (ca) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.blue[100],
+                            child: Text(
+                              ca.name.isNotEmpty
+                                  ? ca.name[0].toUpperCase()
+                                  : 'C',
+                              style: TextStyle(
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                ca.name,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  ca.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  ca.email,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (ca.licenseNumber != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
-                              Text(
-                                ca.email,
+                              decoration: BoxDecoration(
+                                color: Colors.green[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Licensed',
                                 style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
+                                  color: Colors.green[700],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        if (ca.licenseNumber != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Licensed',
-                              style: TextStyle(
-                                color: Colors.green[700],
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  )),
+                  ),
               ],
             ),
           ),
@@ -378,7 +411,7 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
     return Consumer2<ExpenseProvider, IncomeProvider>(
       builder: (context, expenseProvider, incomeProvider, child) {
         final allTransactions = <Map<String, dynamic>>[];
-        
+
         // Add expenses
         for (var expense in expenseProvider.expenses.take(5)) {
           allTransactions.add({
@@ -389,7 +422,7 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
             'category': expense.categoryName,
           });
         }
-        
+
         // Add incomes
         for (var income in incomeProvider.incomes.take(5)) {
           allTransactions.add({
@@ -400,13 +433,15 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
             'category': income.category,
           });
         }
-        
+
         // Sort by date (most recent first)
         allTransactions.sort((a, b) => b['date'].compareTo(a['date']));
-        
+
         return Card(
           elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -436,71 +471,77 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
                     ),
                   )
                 else
-                  ...allTransactions.take(10).map((transaction) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: transaction['type'] == 'income'
-                                ? Colors.green[100]
-                                : Colors.red[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            transaction['type'] == 'income'
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
-                            color: transaction['type'] == 'income'
-                                ? Colors.green[700]
-                                : Colors.red[700],
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  ...allTransactions
+                      .take(10)
+                      .map(
+                        (transaction) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
                             children: [
-                              Text(
-                                transaction['description'],
-                                style: const TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              Text(
-                                transaction['category'],
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: transaction['type'] == 'income'
+                                      ? Colors.green[100]
+                                      : Colors.red[100],
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
+                                child: Icon(
+                                  transaction['type'] == 'income'
+                                      ? Icons.arrow_upward
+                                      : Icons.arrow_downward,
+                                  color: transaction['type'] == 'income'
+                                      ? Colors.green[700]
+                                      : Colors.red[700],
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      transaction['description'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      transaction['category'],
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₹${transaction['amount'].toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      color: transaction['type'] == 'income'
+                                          ? Colors.green[700]
+                                          : Colors.red[700],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${transaction['date'].day}/${transaction['date'].month}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '₹${transaction['amount'].toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: transaction['type'] == 'income'
-                                    ? Colors.green[700]
-                                    : Colors.red[700],
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              '${transaction['date'].day}/${transaction['date'].month}',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
               ],
             ),
           ),
@@ -509,4 +550,3 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
     );
   }
 }
-
