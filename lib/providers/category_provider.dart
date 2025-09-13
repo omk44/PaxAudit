@@ -144,6 +144,15 @@ class CategoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Clear all categories (useful for logout)
+  void clearCategories() {
+    print('Clearing all category data');
+    _categories.clear();
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+  }
+
   // Seed default Indian GST categories (static list) for a company
   // Does not duplicate existing category names (case-insensitive match)
   Future<void> seedDefaultIndianCategories({

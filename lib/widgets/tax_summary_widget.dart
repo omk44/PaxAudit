@@ -86,11 +86,18 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
     final totalIncomeTax = taxCalculation.totalTaxWithCess;
     final taxCategory = _getTaxCategory(totalIncome);
 
-    // No output GST on income. Treat slab-based income tax as payable base
-    // and subtract expense GST (input credit) from it.
+    // CORRECT INDIAN GST CALCULATION:
+    // 1. Output GST on Income (always payable to government)
+    final outputGstOnIncome = _calculateGstOnIncome(totalIncome);
+    
+    // 2. Input GST on Expenses (can be claimed as credit)
     final inputGstOnExpenses = totalExpenseGst;
-    final double payableTax =
-        (totalIncomeTax - inputGstOnExpenses).clamp(0.0, double.infinity).toDouble();
+    
+    // 3. Net GST Payable = Output GST - Input GST Credit
+    final netGstPayable = outputGstOnIncome - inputGstOnExpenses;
+    
+    // 4. Total Tax Payable = Income Tax + Net GST Payable
+    final double totalPayableTax = totalIncomeTax + netGstPayable.clamp(0.0, double.infinity);
 
     final incomeSeries = _toSeries(filteredIncomes.map((i) => MapEntry(i.date, i.amount)).toList());
     final expenseSeries = _toSeries(filteredExpenses.map((e) => MapEntry(e.date, e.amount + e.gstAmount)).toList());
@@ -145,8 +152,10 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
           totalIncome: totalIncome,
           totalExpense: totalExpenseBase,
           profitOrLoss: profitOrLoss,
+          outputGst: outputGstOnIncome,
           inputGst: inputGstOnExpenses,
-          payableTax: payableTax,
+          netGst: netGstPayable,
+          payableTax: totalPayableTax,
           incomeTax: totalIncomeTax,
         ),
         const SizedBox(height: 12),
@@ -157,7 +166,9 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
         _gstVsIncomeExpenseBar(
           totalIncome: totalIncome,
           totalExpenseBase: totalExpenseBase,
-          totalExpenseGst: totalExpenseGst,
+          outputGst: outputGstOnIncome,
+          inputGst: inputGstOnExpenses,
+          netGst: netGstPayable,
           incomeTax: totalIncomeTax,
         ),
         const SizedBox(height: 12),
@@ -171,7 +182,9 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
     required double totalIncome,
     required double totalExpense,
     required double profitOrLoss,
+    required double outputGst,
     required double inputGst,
+    required double netGst,
     required double payableTax,
     required double incomeTax,
   }) {
@@ -206,11 +219,21 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
         const SizedBox(height: 8),
         Row(
           children: [
+            card('Output GST (Income)', '₹${outputGst.toStringAsFixed(2)}', Colors.blue[700]!, Icons.trending_up_rounded),
+            const SizedBox(width: 8),
+            card('Input GST (Expense)', '₹${inputGst.toStringAsFixed(2)}', Colors.orange[700]!, Icons.credit_score_rounded),
+            const SizedBox(width: 8),
+            card('Net GST Payable', '₹${netGst.toStringAsFixed(2)}', Colors.green[700]!, Icons.account_balance_rounded),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             card('Income Tax (slab)', '₹${incomeTax.toStringAsFixed(2)}', Colors.indigo[700]!, Icons.receipt_long_rounded),
             const SizedBox(width: 8),
-            card('Expense GST (credit)', '₹${inputGst.toStringAsFixed(2)}', Colors.orange[700]!, Icons.credit_score_rounded),
+            card('Total Payable', '₹${payableTax.toStringAsFixed(2)}', Colors.purple[700]!, Icons.account_balance_wallet_rounded),
             const SizedBox(width: 8),
-            card('Payable Tax', '₹${payableTax.toStringAsFixed(2)}', Colors.purple[700]!, Icons.account_balance_wallet_rounded),
+            card('GST Credit', netGst < 0 ? '₹${(-netGst).toStringAsFixed(2)}' : '₹0.00', Colors.red[700]!, Icons.savings_rounded),
           ],
         ),
       ],
@@ -288,14 +311,18 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
   Widget _gstVsIncomeExpenseBar({
     required double totalIncome,
     required double totalExpenseBase,
-    required double totalExpenseGst,
+    required double outputGst,
+    required double inputGst,
+    required double netGst,
     required double incomeTax,
   }) {
     final groups = [
       _barAt(0, totalIncome, Colors.green[600]!),
       _barAt(1, totalExpenseBase, Colors.red[600]!),
-      _barAt(2, totalExpenseGst, Colors.orange[700]!),
-      _barAt(3, incomeTax, Colors.indigo[700]!),
+      _barAt(2, outputGst, Colors.blue[700]!),
+      _barAt(3, inputGst, Colors.orange[700]!),
+      _barAt(4, netGst, Colors.purple[700]!),
+      _barAt(5, incomeTax, Colors.indigo[700]!),
     ];
     return Card(
       elevation: 2,
@@ -345,7 +372,7 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
     );
   }
 
-  static const List<String> _barLabels = ['Income', 'Expense', 'GST', 'IT'];
+  static const List<String> _barLabels = ['Income', 'Expense', 'Output GST', 'Input GST', 'Net GST', 'Income Tax'];
 
   BarChartGroupData _barAt(int x, double value, Color color) {
     return BarChartGroupData(
@@ -415,6 +442,13 @@ class _TaxSummaryWidgetState extends State<TaxSummaryWidget> {
   }
 
   String _fmt(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  // Calculate GST on Income (Output GST)
+  double _calculateGstOnIncome(double income) {
+    // For Indian GST, income is typically subject to 18% GST
+    // This can be customized based on business type and income source
+    return income * 0.18; // 18% GST on income
+  }
 }
 
 class _TaxBreakdownWidget extends StatelessWidget {

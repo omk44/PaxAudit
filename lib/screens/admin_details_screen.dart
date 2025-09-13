@@ -29,17 +29,7 @@ class _AdminDetailsScreenState extends State<AdminDetailsScreen> {
     final company = auth.selectedCompany;
 
     if (company != null) {
-      // Clear existing data first to prevent cross-company data leakage
-      Provider.of<ExpenseProvider>(
-        context,
-        listen: false,
-      ).clearExpensesForCompanySwitch();
-      Provider.of<IncomeProvider>(
-        context,
-        listen: false,
-      ).clearIncomesForCompanySwitch();
-
-      // Load expenses and income for the company
+      // Load expenses and income for the company (provider will handle clearing if needed)
       await Provider.of<ExpenseProvider>(
         context,
         listen: false,

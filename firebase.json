@@ -18,5 +18,9 @@
                 }
             }
         }
+    },
+    "firestore": {
+        "rules": "firestore_rules.txt",
+        "indexes": "firestore.indexes.json"
     }
 }

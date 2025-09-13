@@ -8,6 +8,7 @@ class IncomeProvider extends ChangeNotifier {
   final List<Income> _incomes = [];
   bool _isLoading = false;
   String? _error;
+  String? _currentCompanyId; // Track current company
 
   List<Income> get incomes => List.unmodifiable(_incomes);
   bool get isLoading => _isLoading;
@@ -19,6 +20,18 @@ class IncomeProvider extends ChangeNotifier {
 
   // Load incomes for a specific company
   Future<void> loadIncomesForCompany(String companyId) async {
+    // Don't reload if already loaded for the same company and not currently loading
+    if (_currentCompanyId == companyId && _incomes.isNotEmpty && !_isLoading) {
+      print('Incomes already loaded for company: $companyId, skipping reload');
+      return;
+    }
+
+    // Don't reload if already loading for the same company
+    if (_currentCompanyId == companyId && _isLoading) {
+      print('Already loading incomes for company: $companyId, skipping duplicate load');
+      return;
+    }
+
     try {
       print('Loading incomes for company: $companyId');
       _isLoading = true;
@@ -34,8 +47,21 @@ class IncomeProvider extends ChangeNotifier {
       print(
         'Found ${snapshot.docs.length} income records for company $companyId',
       );
-      _incomes.clear();
-      _incomes.addAll(snapshot.docs.map((doc) => Income.fromFirestore(doc)));
+      
+      // Only clear if switching to a different company
+      if (_currentCompanyId != companyId) {
+        _incomes.clear();
+      }
+      
+      // Add incomes from Firestore, avoiding duplicates
+      for (final doc in snapshot.docs) {
+        final income = Income.fromFirestore(doc);
+        final existingIndex = _incomes.indexWhere((i) => i.id == income.id);
+        if (existingIndex == -1) {
+          _incomes.add(income);
+        }
+      }
+      _currentCompanyId = companyId;
 
       _isLoading = false;
       notifyListeners();
@@ -58,23 +84,28 @@ class IncomeProvider extends ChangeNotifier {
           .collection('incomes')
           .add(income.toFirestore());
 
-      // Add to local list with the generated ID
+      // Add to local list with the generated ID (only if not already present)
       final createdIncome = income.copyWith();
-      _incomes.insert(
-        0,
-        Income(
-          id: docRef.id,
-          amount: createdIncome.amount,
-          description: createdIncome.description,
-          category: createdIncome.category,
-          date: createdIncome.date,
-          addedBy: createdIncome.addedBy,
-          paymentMethod: createdIncome.paymentMethod,
-          transactionId: createdIncome.transactionId,
-          history: createdIncome.history,
-          companyId: createdIncome.companyId,
-        ),
-      ); // Insert at beginning for recent first
+      
+      // Check if income already exists to prevent duplicates
+      final existingIndex = _incomes.indexWhere((i) => i.id == docRef.id);
+      if (existingIndex == -1) {
+        _incomes.insert(
+          0,
+          Income(
+            id: docRef.id,
+            amount: createdIncome.amount,
+            description: createdIncome.description,
+            category: createdIncome.category,
+            date: createdIncome.date,
+            addedBy: createdIncome.addedBy,
+            paymentMethod: createdIncome.paymentMethod,
+            transactionId: createdIncome.transactionId,
+            history: createdIncome.history,
+            companyId: createdIncome.companyId,
+          ),
+        ); // Insert at beginning for recent first
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -201,21 +232,30 @@ class IncomeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear all incomes (useful for logout or company switch)
+  // Clear all incomes (useful for logout)
   void clearIncomes() {
     print('Clearing all income data');
     _incomes.clear();
+    _currentCompanyId = null;
     _isLoading = false;
     _error = null;
     notifyListeners();
   }
 
-  // Clear incomes for company switch
+  // Clear incomes for company switch - only clear if switching to different company
   void clearIncomesForCompanySwitch() {
     print('Clearing income data for company switch');
     _incomes.clear();
+    _currentCompanyId = null;
     _isLoading = false;
     _error = null;
     notifyListeners();
+  }
+
+  // Force reload data for current company
+  Future<void> reloadCurrentCompanyData() async {
+    if (_currentCompanyId != null) {
+      await loadIncomesForCompany(_currentCompanyId!);
+    }
   }
 }

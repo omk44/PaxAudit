@@ -253,11 +253,7 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
-          // Clear existing data first to prevent cross-company data leakage
-          Provider.of<IncomeProvider>(
-            context,
-            listen: false,
-          ).clearIncomesForCompanySwitch();
+          // Load data for the company (provider will handle clearing if needed)
           await Provider.of<IncomeProvider>(
             context,
             listen: false,
@@ -301,10 +297,20 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
           ? Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: incomeProvider.incomes.length,
-                    itemBuilder: (context, index) {
-                      final inc = incomeProvider.incomes[index];
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+                      if (companyId != null) {
+                        await Provider.of<IncomeProvider>(context, listen: false)
+                            .loadIncomesForCompany(companyId);
+                      }
+                    },
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: incomeProvider.incomes.length,
+                      itemBuilder: (context, index) {
+                        final inc = incomeProvider.incomes[index];
                       return ListTile(
                         title: Text(
                           'Amount: ₹${inc.amount.toStringAsFixed(2)}',
@@ -342,6 +348,7 @@ class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
                         ),
                       );
                     },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 72),
@@ -399,11 +406,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final companyId = auth.companyId ?? auth.selectedCompany?.id;
         if (companyId != null) {
-          // Clear existing data first to prevent cross-company data leakage
-          Provider.of<ExpenseProvider>(
-            context,
-            listen: false,
-          ).clearExpensesForCompanySwitch();
+          // Load data for the company (provider will handle clearing if needed)
           await Provider.of<ExpenseProvider>(
             context,
             listen: false,
@@ -452,9 +455,21 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
           ? Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: expenseProvider.expenses.length,
-                    itemBuilder: (context, index) {
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+                      if (companyId != null) {
+                        await Provider.of<ExpenseProvider>(context, listen: false)
+                            .loadExpensesForCompany(companyId);
+                        await Provider.of<CategoryProvider>(context, listen: false)
+                            .loadCategoriesForCompany(companyId);
+                      }
+                    },
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: expenseProvider.expenses.length,
+                      itemBuilder: (context, index) {
                       final exp = expenseProvider.expenses[index];
                       final catName = categoryProvider.categories
                           .firstWhere(
@@ -509,6 +524,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
                         ),
                       );
                     },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 72),
@@ -795,3 +811,4 @@ class _IncomeExpenseManagerScreenState
     );
   }
 }
+

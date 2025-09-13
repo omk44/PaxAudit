@@ -41,16 +41,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final companyId = auth.companyId ?? auth.selectedCompany?.id;
     if (companyId != null && companyId != _lastLoadedCompanyId) {
-      // Clear existing data first to prevent cross-company data leakage
-      Provider.of<ExpenseProvider>(
-        context,
-        listen: false,
-      ).clearExpensesForCompanySwitch();
-      Provider.of<IncomeProvider>(
-        context,
-        listen: false,
-      ).clearIncomesForCompanySwitch();
-
+      // Load data for the company (provider will handle clearing if needed)
       await Future.wait([
         Provider.of<ExpenseProvider>(
           context,

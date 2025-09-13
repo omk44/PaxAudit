@@ -8,6 +8,7 @@ class ExpenseProvider extends ChangeNotifier {
   final List<Expense> _expenses = [];
   bool _isLoading = false;
   String? _error;
+  String? _currentCompanyId; // Track current company
 
   List<Expense> get expenses => List.unmodifiable(_expenses);
   bool get isLoading => _isLoading;
@@ -23,6 +24,18 @@ class ExpenseProvider extends ChangeNotifier {
 
   // Load expenses for a specific company
   Future<void> loadExpensesForCompany(String companyId) async {
+    // Don't reload if already loaded for the same company and not currently loading
+    if (_currentCompanyId == companyId && _expenses.isNotEmpty && !_isLoading) {
+      print('Expenses already loaded for company: $companyId, skipping reload');
+      return;
+    }
+
+    // Don't reload if already loading for the same company
+    if (_currentCompanyId == companyId && _isLoading) {
+      print('Already loading expenses for company: $companyId, skipping duplicate load');
+      return;
+    }
+
     try {
       print('Loading expenses for company: $companyId');
       _isLoading = true;
@@ -38,8 +51,21 @@ class ExpenseProvider extends ChangeNotifier {
       print(
         'Found ${snapshot.docs.length} expense records for company $companyId',
       );
-      _expenses.clear();
-      _expenses.addAll(snapshot.docs.map((doc) => Expense.fromFirestore(doc)));
+      
+      // Only clear if switching to a different company
+      if (_currentCompanyId != companyId) {
+        _expenses.clear();
+      }
+      
+      // Add expenses from Firestore, avoiding duplicates
+      for (final doc in snapshot.docs) {
+        final expense = Expense.fromFirestore(doc);
+        final existingIndex = _expenses.indexWhere((e) => e.id == expense.id);
+        if (existingIndex == -1) {
+          _expenses.add(expense);
+        }
+      }
+      _currentCompanyId = companyId;
 
       _isLoading = false;
       notifyListeners();
@@ -62,29 +88,34 @@ class ExpenseProvider extends ChangeNotifier {
           .collection('expenses')
           .add(expense.toFirestore());
 
-      // Add to local list with the generated ID
+      // Add to local list with the generated ID (only if not already present)
       final createdExpense = expense.copyWith().copyWith(
         companyId: expense.companyId,
       );
-      // Ensure the created expense carries the Firestore-generated id
-      _expenses.insert(
-        0,
-        Expense(
-          id: docRef.id,
-          categoryId: createdExpense.categoryId,
-          categoryName: createdExpense.categoryName,
-          amount: createdExpense.amount,
-          gstPercentage: createdExpense.gstPercentage,
-          gstAmount: createdExpense.gstAmount,
-          invoiceNumber: createdExpense.invoiceNumber,
-          description: createdExpense.description,
-          date: createdExpense.date,
-          addedBy: createdExpense.addedBy,
-          paymentMethod: createdExpense.paymentMethod,
-          history: createdExpense.history,
-          companyId: createdExpense.companyId,
-        ),
-      ); // Insert at beginning for recent first
+      
+      // Check if expense already exists to prevent duplicates
+      final existingIndex = _expenses.indexWhere((e) => e.id == docRef.id);
+      if (existingIndex == -1) {
+        // Ensure the created expense carries the Firestore-generated id
+        _expenses.insert(
+          0,
+          Expense(
+            id: docRef.id,
+            categoryId: createdExpense.categoryId,
+            categoryName: createdExpense.categoryName,
+            amount: createdExpense.amount,
+            gstPercentage: createdExpense.gstPercentage,
+            gstAmount: createdExpense.gstAmount,
+            invoiceNumber: createdExpense.invoiceNumber,
+            description: createdExpense.description,
+            date: createdExpense.date,
+            addedBy: createdExpense.addedBy,
+            paymentMethod: createdExpense.paymentMethod,
+            history: createdExpense.history,
+            companyId: createdExpense.companyId,
+          ),
+        ); // Insert at beginning for recent first
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -229,21 +260,30 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear all expenses (useful for logout or company switch)
+  // Clear all expenses (useful for logout)
   void clearExpenses() {
     print('Clearing all expense data');
     _expenses.clear();
+    _currentCompanyId = null;
     _isLoading = false;
     _error = null;
     notifyListeners();
   }
 
-  // Clear expenses for company switch
+  // Clear expenses for company switch - only clear if switching to different company
   void clearExpensesForCompanySwitch() {
     print('Clearing expense data for company switch');
     _expenses.clear();
+    _currentCompanyId = null;
     _isLoading = false;
     _error = null;
     notifyListeners();
+  }
+
+  // Force reload data for current company
+  Future<void> reloadCurrentCompanyData() async {
+    if (_currentCompanyId != null) {
+      await loadExpensesForCompany(_currentCompanyId!);
+    }
   }
 }

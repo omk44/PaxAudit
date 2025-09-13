@@ -339,4 +339,13 @@ class CAProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  // Clear all CAs (useful for logout)
+  void clearCAs() {
+    print('Clearing all CA data');
+    _cas.clear();
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+  }
 }
