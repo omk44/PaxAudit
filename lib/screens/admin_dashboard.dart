@@ -5,6 +5,7 @@ import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ca_provider.dart';
+import '../providers/bank_statement_provider.dart';
 import 'management_screens.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -59,6 +60,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           context,
           listen: false,
         ).loadCAsForCompany(companyId),
+        Provider.of<BankStatementProvider>(
+          context,
+          listen: false,
+        ).loadBankStatementsForCompany(companyId),
       ]);
       _lastLoadedCompanyId = companyId;
     }

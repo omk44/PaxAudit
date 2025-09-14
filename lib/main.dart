@@ -10,6 +10,7 @@ import 'providers/company_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/income_provider.dart';
+import 'providers/bank_statement_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -50,6 +51,7 @@ class PaxAuditApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => IncomeProvider()),
+        ChangeNotifierProvider(create: (_) => BankStatementProvider()),
       ],
       child: MaterialApp(
         title: 'PaxAudit',

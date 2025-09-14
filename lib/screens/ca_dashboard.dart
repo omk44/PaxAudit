@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
+import '../providers/bank_statement_provider.dart';
 import 'management_screens.dart';
 
 class CADashboard extends StatefulWidget {
@@ -57,6 +58,10 @@ class _CADashboardState extends State<CADashboard> {
           context,
           listen: false,
         ).loadCategoriesForCompany(companyId),
+        Provider.of<BankStatementProvider>(
+          context,
+          listen: false,
+        ).loadBankStatementsForCompany(companyId),
       ]);
 
       _lastLoadedCompanyId = companyId;
