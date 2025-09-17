@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:io';
 import '../models/bank_statement.dart';
 
 class BankStatementProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   final List<BankStatement> _bankStatements = [];
   bool _isLoading = false;
@@ -19,15 +16,7 @@ class BankStatementProvider extends ChangeNotifier {
 
   // Load bank statements for a specific company
   Future<void> loadBankStatementsForCompany(String companyId) async {
-    // Don't reload if already loaded for the same company and not currently loading
-    if (_currentCompanyId == companyId &&
-        _bankStatements.isNotEmpty &&
-        !_isLoading) {
-      print(
-        'Bank statements already loaded for company: $companyId, skipping reload',
-      );
-      return;
-    }
+    final switchingCompany = _currentCompanyId != null && _currentCompanyId != companyId;
 
     // Don't reload if already loading for the same company
     if (_currentCompanyId == companyId && _isLoading) {
@@ -46,28 +35,28 @@ class BankStatementProvider extends ChangeNotifier {
       final snapshot = await _firestore
           .collection('bank_statements')
           .where('companyId', isEqualTo: companyId)
-          .orderBy('uploadedAt', descending: true)
+          .orderBy('createdAt', descending: true)
           .get();
 
       print(
         'Found ${snapshot.docs.length} bank statement records for company $companyId',
       );
 
-      // Only clear if switching to a different company
-      if (_currentCompanyId != companyId) {
-        _bankStatements.clear();
-      }
-
-      // Add bank statements from Firestore, avoiding duplicates
+      // Build a fresh list from snapshot, then replace local list atomically
+      final List<BankStatement> fresh = [];
       for (final doc in snapshot.docs) {
-        final bankStatement = BankStatement.fromFirestore(doc);
-        final existingIndex = _bankStatements.indexWhere(
-          (bs) => bs.id == bankStatement.id,
-        );
-        if (existingIndex == -1) {
-          _bankStatements.add(bankStatement);
+        try {
+          final bankStatement = BankStatement.fromFirestore(doc);
+          fresh.add(bankStatement);
+        } catch (e) {
+          print('Error parsing bank statement document ${doc.id}: $e');
+          // Skip invalid documents
         }
       }
+
+      _bankStatements
+        ..clear()
+        ..addAll(fresh);
       _currentCompanyId = companyId;
 
       _isLoading = false;
@@ -80,11 +69,14 @@ class BankStatementProvider extends ChangeNotifier {
     }
   }
 
-  // Upload a new bank statement
-  Future<bool> uploadBankStatement({
+  // Admin creates a new bank statement link entry
+  Future<bool> createBankStatementLink({
     required String companyId,
-    required String fileName,
-    required File file,
+    required String title,
+    required String bankName,
+    required String linkUrl,
+    required DateTime statementStartDate,
+    required DateTime statementEndDate,
     required String uploadedBy,
   }) async {
     try {
@@ -92,30 +84,24 @@ class BankStatementProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Upload file to Firebase Storage
-      final ref = _storage
-          .ref()
-          .child('bank_statements')
-          .child(companyId)
-          .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');
-
-      final uploadTask = await ref.putFile(file);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-
       // Create bank statement record in Firestore
+      final now = DateTime.now();
       final bankStatement = BankStatement(
         id: '',
         companyId: companyId,
-        fileName: fileName,
-        fileUrl: downloadUrl,
-        uploadedAt: DateTime.now(),
+        title: title,
+        bankName: bankName,
+        linkUrl: linkUrl,
+        statementStartDate: statementStartDate,
+        statementEndDate: statementEndDate,
+        createdAt: now,
         uploadedBy: uploadedBy,
         history: [
           BankStatementHistory(
-            action: 'uploaded',
+            action: 'admin_uploaded',
             performedBy: uploadedBy,
-            timestamp: DateTime.now(),
-            comments: 'Bank statement uploaded',
+            timestamp: now,
+            comments: 'Bank statement link uploaded by admin for CA review',
           ),
         ],
       );
@@ -132,14 +118,118 @@ class BankStatementProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Failed to upload bank statement: ${e.toString()}';
+      _error = 'Failed to create bank statement: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // Update bank statement (for CA comments, admin comments, status changes)
+  // CA reviews and updates bank statement status
+  Future<bool> caReviewBankStatement({
+    required String id,
+    required BankStatementStatus status,
+    String? caComments,
+    required String updatedBy,
+  }) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
+      final updatedHistory = List<BankStatementHistory>.from(bankStatement.history);
+
+      updatedHistory.add(
+        BankStatementHistory(
+          action: 'ca_reviewed',
+          performedBy: updatedBy,
+          timestamp: DateTime.now(),
+          comments: caComments ?? 'CA reviewed and updated status',
+          oldValue: bankStatement.status.name,
+          newValue: status.name,
+        ),
+      );
+
+      final updatedBankStatement = bankStatement.copyWith(
+        caComments: caComments ?? bankStatement.caComments,
+        status: status,
+        history: updatedHistory,
+      );
+
+      await _firestore
+          .collection('bank_statements')
+          .doc(id)
+          .update(updatedBankStatement.toFirestore());
+
+      // Update local list
+      final index = _bankStatements.indexWhere((bs) => bs.id == id);
+      if (index != -1) {
+        _bankStatements[index] = updatedBankStatement;
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to update bank statement review: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Admin adds final comments after CA review
+  Future<bool> adminFinalReview({
+    required String id,
+    String? adminComments,
+    required String updatedBy,
+  }) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
+      final updatedHistory = List<BankStatementHistory>.from(bankStatement.history);
+
+      updatedHistory.add(
+        BankStatementHistory(
+          action: 'admin_final_review',
+          performedBy: updatedBy,
+          timestamp: DateTime.now(),
+          comments: adminComments ?? 'Admin final review completed',
+        ),
+      );
+
+      final updatedBankStatement = bankStatement.copyWith(
+        adminComments: adminComments ?? bankStatement.adminComments,
+        history: updatedHistory,
+      );
+
+      await _firestore
+          .collection('bank_statements')
+          .doc(id)
+          .update(updatedBankStatement.toFirestore());
+
+      // Update local list
+      final index = _bankStatements.indexWhere((bs) => bs.id == id);
+      if (index != -1) {
+        _bankStatements[index] = updatedBankStatement;
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to add admin final review: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Legacy method for backward compatibility
   Future<bool> updateBankStatement({
     required String id,
     String? caComments,
@@ -204,21 +294,63 @@ class BankStatementProvider extends ChangeNotifier {
     }
   }
 
+  // Admin edits an existing bank statement link entry
+  Future<bool> editBankStatementLink({
+    required String id,
+    required String title,
+    required String bankName,
+    required String linkUrl,
+    required DateTime statementStartDate,
+    required DateTime statementEndDate,
+    required String updatedBy,
+  }) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final existing = _bankStatements.firstWhere((bs) => bs.id == id);
+      final updated = existing.copyWith(
+        title: title,
+        bankName: bankName,
+        linkUrl: linkUrl,
+        statementStartDate: statementStartDate,
+        statementEndDate: statementEndDate,
+        history: [
+          ...existing.history,
+          BankStatementHistory(
+            action: 'admin_updated',
+            performedBy: updatedBy,
+            timestamp: DateTime.now(),
+            comments: 'Bank statement link updated by admin',
+          ),
+        ],
+      );
+
+      await _firestore.collection('bank_statements').doc(id).update(
+            updated.toFirestore(),
+          );
+
+      final index = _bankStatements.indexWhere((bs) => bs.id == id);
+      if (index != -1) _bankStatements[index] = updated;
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to update bank statement: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Delete bank statement
   Future<bool> deleteBankStatement(String id) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
-
-      final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
-
-      // Delete file from storage
-      try {
-        await _storage.refFromURL(bankStatement.fileUrl).delete();
-      } catch (e) {
-        print('Error deleting file from storage: $e');
-      }
 
       // Delete from Firestore
       await _firestore.collection('bank_statements').doc(id).delete();

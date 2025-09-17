@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 class BankStatement {
   final String id;
   final String companyId;
-  final String fileName;
-  final String fileUrl;
-  final DateTime uploadedAt;
+  final String title;
+  final String bankName;
+  final String linkUrl;
+  final DateTime statementStartDate;
+  final DateTime statementEndDate;
+  final DateTime createdAt;
   final String uploadedBy;
   final List<BankStatementHistory> history;
   final String? caComments;
@@ -16,9 +19,12 @@ class BankStatement {
   BankStatement({
     required this.id,
     required this.companyId,
-    required this.fileName,
-    required this.fileUrl,
-    required this.uploadedAt,
+    required this.title,
+    required this.bankName,
+    required this.linkUrl,
+    required this.statementStartDate,
+    required this.statementEndDate,
+    required this.createdAt,
     required this.uploadedBy,
     required this.history,
     this.caComments,
@@ -31,9 +37,18 @@ class BankStatement {
     return BankStatement(
       id: doc.id,
       companyId: data['companyId'] ?? '',
-      fileName: data['fileName'] ?? '',
-      fileUrl: data['fileUrl'] ?? '',
-      uploadedAt: (data['uploadedAt'] as Timestamp).toDate(),
+      title: data['title'] ?? data['fileName'] ?? '',
+      bankName: data['bankName'] ?? '',
+      linkUrl: data['linkUrl'] ?? data['fileUrl'] ?? '',
+      statementStartDate:
+          (data['statementStartDate'] as Timestamp?)?.toDate() ??
+              (data['uploadedAt'] as Timestamp).toDate(),
+      statementEndDate:
+          (data['statementEndDate'] as Timestamp?)?.toDate() ??
+              (data['uploadedAt'] as Timestamp).toDate(),
+      createdAt:
+          (data['createdAt'] as Timestamp?)?.toDate() ??
+              (data['uploadedAt'] as Timestamp).toDate(),
       uploadedBy: data['uploadedBy'] ?? '',
       history: (data['history'] as List<dynamic>? ?? [])
           .map((h) => BankStatementHistory.fromMap(h))
@@ -50,9 +65,12 @@ class BankStatement {
   Map<String, dynamic> toFirestore() {
     return {
       'companyId': companyId,
-      'fileName': fileName,
-      'fileUrl': fileUrl,
-      'uploadedAt': Timestamp.fromDate(uploadedAt),
+      'title': title,
+      'bankName': bankName,
+      'linkUrl': linkUrl,
+      'statementStartDate': Timestamp.fromDate(statementStartDate),
+      'statementEndDate': Timestamp.fromDate(statementEndDate),
+      'createdAt': Timestamp.fromDate(createdAt),
       'uploadedBy': uploadedBy,
       'history': history.map((h) => h.toMap()).toList(),
       'caComments': caComments,
@@ -64,9 +82,12 @@ class BankStatement {
   BankStatement copyWith({
     String? id,
     String? companyId,
-    String? fileName,
-    String? fileUrl,
-    DateTime? uploadedAt,
+    String? title,
+    String? bankName,
+    String? linkUrl,
+    DateTime? statementStartDate,
+    DateTime? statementEndDate,
+    DateTime? createdAt,
     String? uploadedBy,
     List<BankStatementHistory>? history,
     String? caComments,
@@ -76,9 +97,12 @@ class BankStatement {
     return BankStatement(
       id: id ?? this.id,
       companyId: companyId ?? this.companyId,
-      fileName: fileName ?? this.fileName,
-      fileUrl: fileUrl ?? this.fileUrl,
-      uploadedAt: uploadedAt ?? this.uploadedAt,
+      title: title ?? this.title,
+      bankName: bankName ?? this.bankName,
+      linkUrl: linkUrl ?? this.linkUrl,
+      statementStartDate: statementStartDate ?? this.statementStartDate,
+      statementEndDate: statementEndDate ?? this.statementEndDate,
+      createdAt: createdAt ?? this.createdAt,
       uploadedBy: uploadedBy ?? this.uploadedBy,
       history: history ?? this.history,
       caComments: caComments ?? this.caComments,
@@ -129,24 +153,33 @@ class BankStatementHistory {
 }
 
 enum BankStatementStatus {
-  uploaded,
-  underReview,
-  approved,
-  rejected,
-  needsRevision,
+  uploaded,           // Admin uploaded, waiting for CA review
+  underReview,        // CA is reviewing and cross-matching
+  matched,           // CA completed cross-matching with transactions
+  partiallyMatched,  // CA found some matches, needs more work
+  needsClarification, // CA needs admin clarification
+  approved,          // CA approved after complete matching
+  rejected,          // CA rejected due to issues
+  needsRevision,     // CA marked for revision
 }
 
 extension BankStatementStatusExtension on BankStatementStatus {
   String get displayName {
     switch (this) {
       case BankStatementStatus.uploaded:
-        return 'Uploaded';
+        return 'Uploaded by Admin';
       case BankStatementStatus.underReview:
-        return 'Under Review';
+        return 'Under CA Review';
+      case BankStatementStatus.matched:
+        return 'Matched by CA';
+      case BankStatementStatus.partiallyMatched:
+        return 'Partially Matched';
+      case BankStatementStatus.needsClarification:
+        return 'Needs Clarification';
       case BankStatementStatus.approved:
-        return 'Approved';
+        return 'Approved by CA';
       case BankStatementStatus.rejected:
-        return 'Rejected';
+        return 'Rejected by CA';
       case BankStatementStatus.needsRevision:
         return 'Needs Revision';
     }
@@ -155,11 +188,17 @@ extension BankStatementStatusExtension on BankStatementStatus {
   String get icon {
     switch (this) {
       case BankStatementStatus.uploaded:
-        return '📄';
+        return '📤';
       case BankStatementStatus.underReview:
-        return '👀';
-      case BankStatementStatus.approved:
+        return '🔍';
+      case BankStatementStatus.matched:
         return '✅';
+      case BankStatementStatus.partiallyMatched:
+        return '⚠️';
+      case BankStatementStatus.needsClarification:
+        return '❓';
+      case BankStatementStatus.approved:
+        return '🎯';
       case BankStatementStatus.rejected:
         return '❌';
       case BankStatementStatus.needsRevision:
@@ -173,12 +212,18 @@ extension BankStatementStatusExtension on BankStatementStatus {
         return Colors.blue;
       case BankStatementStatus.underReview:
         return Colors.orange;
-      case BankStatementStatus.approved:
+      case BankStatementStatus.matched:
         return Colors.green;
+      case BankStatementStatus.partiallyMatched:
+        return Colors.amber;
+      case BankStatementStatus.needsClarification:
+        return Colors.purple;
+      case BankStatementStatus.approved:
+        return Colors.green.shade700;
       case BankStatementStatus.rejected:
         return Colors.red;
       case BankStatementStatus.needsRevision:
-        return Colors.purple;
+        return Colors.purple.shade600;
     }
   }
 }

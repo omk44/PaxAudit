@@ -1,9 +1,7 @@
 // screens/placeholder_screens.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../providers/bank_statement_provider.dart';
 import '../models/bank_statement.dart';
@@ -45,93 +43,76 @@ class BankStatementsScreen extends StatefulWidget {
 }
 
 class _BankStatementsScreenState extends State<BankStatementsScreen> {
-  bool _loadedOnce = false;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_loadedOnce) {
-      _loadedOnce = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final auth = Provider.of<AuthProvider>(context, listen: false);
-        final companyId = auth.companyId ?? auth.selectedCompany?.id;
-        if (companyId != null) {
-          await Provider.of<BankStatementProvider>(
-            context,
-            listen: false,
-          ).loadBankStatementsForCompany(companyId);
-        }
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+      if (companyId != null) {
+        await Provider.of<BankStatementProvider>(
+          context,
+          listen: false,
+        ).loadBankStatementsForCompany(companyId);
+      }
+    });
   }
 
-  Future<void> _uploadBankStatement() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-        allowMultiple: false,
-      );
+  Future<void> _addOrEditLink({BankStatement? existing}) async {
+    await showDialog(
+      context: context,
+      builder: (_) => BankStatementLinkDialog(existing: existing),
+    );
+  }
 
-      if (result != null && result.files.isNotEmpty) {
-        final file = File(result.files.first.path!);
-        final fileName = result.files.first.name;
+  Future<void> _caReview(BankStatement bankStatement) async {
+    await showDialog(
+      context: context,
+      builder: (_) => BankStatementCAReviewDialog(bankStatement: bankStatement),
+    );
+  }
 
-        final auth = Provider.of<AuthProvider>(context, listen: false);
-        final companyId = auth.companyId ?? auth.selectedCompany?.id;
-        final uploadedBy = auth.role ?? 'admin';
-
-        if (companyId != null) {
-          final success =
-              await Provider.of<BankStatementProvider>(
-                context,
-                listen: false,
-              ).uploadBankStatement(
-                companyId: companyId,
-                fileName: fileName,
-                file: file,
-                uploadedBy: uploadedBy,
-              );
-
-          if (success && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Bank statement uploaded successfully'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to upload bank statement'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  Future<void> _adminFinalReview(BankStatement bankStatement) async {
+    await showDialog(
+      context: context,
+      builder: (_) => BankStatementAdminFinalReviewDialog(bankStatement: bankStatement),
+    );
   }
 
   Future<void> _openPdf(String url) async {
     try {
-      final uri = Uri.parse(url);
+      if (url.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid URL'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid URL format'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Could not open PDF'),
+              content: Text('Could not open link'),
               backgroundColor: Colors.red,
             ),
           );
@@ -141,7 +122,7 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error opening PDF: ${e.toString()}'),
+            content: Text('Error opening link: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -155,6 +136,14 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
     final auth = Provider.of<AuthProvider>(context);
     final hasData = bankStatementProvider.bankStatements.isNotEmpty;
 
+    // Load data if not already loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+      if (companyId != null && bankStatementProvider.bankStatements.isEmpty && !bankStatementProvider.isLoading) {
+        await bankStatementProvider.loadBankStatementsForCompany(companyId);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -165,20 +154,24 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: _uploadBankStatement,
-            tooltip: 'Upload Bank Statement',
-          ),
+          if (auth.role == 'admin') ...[
+            IconButton(
+              icon: const Icon(Icons.add_link),
+              onPressed: () => _addOrEditLink(),
+              tooltip: 'Add Statement Link (Admin)',
+            ),
+          ],
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _uploadBankStatement,
-        icon: const Icon(Icons.upload_file),
-        label: const Text('Upload PDF'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
+      floatingActionButton: auth.role == 'admin'
+          ? FloatingActionButton.extended(
+              onPressed: () => _addOrEditLink(),
+              icon: const Icon(Icons.add_link),
+              label: const Text('Add Link'),
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            )
+          : null,
       body: hasData
           ? Column(
               children: [
@@ -234,7 +227,7 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                               ),
                             ),
                             title: Text(
-                              bankStatement.fileName,
+                              bankStatement.title,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -243,6 +236,16 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Bank: ${bankStatement.bankName}',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Range: ${_formatShortDate(bankStatement.statementStartDate)} - ${_formatShortDate(bankStatement.statementEndDate)}',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -263,7 +266,7 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Uploaded: ${_formatDate(bankStatement.uploadedAt)}',
+                                  'Created: ${_formatDate(bankStatement.createdAt)}',
                                   style: const TextStyle(color: Colors.grey),
                                 ),
                                 Text(
@@ -335,11 +338,24 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.visibility),
-                                  onPressed: () =>
-                                      _openPdf(bankStatement.fileUrl),
-                                  tooltip: 'View PDF',
+                                  onPressed: () => _openPdf(bankStatement.linkUrl),
+                                  tooltip: 'Open Link',
                                   color: Colors.blue,
                                 ),
+                                if (auth.role == 'admin')
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () => _addOrEditLink(existing: bankStatement),
+                                    tooltip: 'Edit Link (Admin)',
+                                    color: Colors.green,
+                                  ),
+                                if (auth.role == 'ca')
+                                  IconButton(
+                                    icon: const Icon(Icons.rate_review),
+                                    onPressed: () => _caReview(bankStatement),
+                                    tooltip: 'CA Review',
+                                    color: Colors.orange,
+                                  ),
                                 IconButton(
                                   icon: const Icon(Icons.history),
                                   onPressed: () => showDialog(
@@ -351,19 +367,12 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                   tooltip: 'View History',
                                   color: Colors.grey,
                                 ),
-                                if (auth.role == 'ca' || auth.role == 'admin')
+                                if (auth.role == 'admin')
                                   IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => showDialog(
-                                      context: context,
-                                      builder: (_) =>
-                                          BankStatementCommentDialog(
-                                            bankStatement: bankStatement,
-                                            userRole: auth.role ?? 'admin',
-                                          ),
-                                    ),
-                                    tooltip: 'Add Comments',
-                                    color: Colors.green,
+                                    icon: const Icon(Icons.admin_panel_settings),
+                                    onPressed: () => _adminFinalReview(bankStatement),
+                                    tooltip: 'Admin Final Review',
+                                    color: Colors.purple,
                                   ),
                                 if (auth.role == 'admin')
                                   IconButton(
@@ -384,7 +393,7 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                 const SizedBox(height: 72),
               ],
             )
-          : Center(
+      : Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -412,15 +421,15 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Upload PDF bank statements for CA review',
+                    'Add bank statement links for CA review',
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: _uploadBankStatement,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Upload First Statement'),
+                    onPressed: () => _addOrEditLink(),
+                    icon: const Icon(Icons.add_link),
+                    label: const Text('Add First Link'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -441,6 +450,10 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatShortDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   Future<void> _deleteBankStatement(String id) async {
