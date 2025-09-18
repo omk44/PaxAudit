@@ -22,6 +22,7 @@ import 'screens/ca_dashboard.dart';
 import 'screens/management_screens.dart';
 import 'screens/ca_details_screen.dart';
 import 'screens/placeholder_screens.dart';
+import 'screens/admin_profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +69,7 @@ class PaxAuditApp extends StatelessWidget {
           '/signup': (context) => const SignupScreen(),
           '/admin_dashboard': (context) => const AdminDashboard(),
           '/admin_details': (context) => const AdminDetailsScreen(),
+          '/admin_profile': (context) => const AdminProfileScreen(),
           '/ca_dashboard': (context) => const CADashboard(),
           '/ca_management': (context) => const CAManagementScreen(),
           '/ca_details': (context) => const CADetailsScreen(),

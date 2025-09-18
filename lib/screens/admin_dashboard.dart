@@ -97,6 +97,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 subtitle: const Text('View company information and statistics'),
                 onTap: () => Navigator.pushNamed(context, '/admin_details'),
               ),
+              ListTile(
+                leading: const Icon(Icons.person, color: Colors.purple),
+                title: const Text('Admin Profile'),
+                subtitle: const Text('Edit company details and profile information'),
+                onTap: () => Navigator.pushNamed(context, '/admin_profile'),
+              ),
               const Divider(),
               ListTile(
                 leading: const Icon(

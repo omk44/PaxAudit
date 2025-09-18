@@ -7,8 +7,17 @@ class Company {
   String adminName;
   String? description;
   String? address;
+  String? city;
+  String? state;
+  String? pincode;
   String? phoneNumber;
+  String? email;
   String? website;
+  String? gstNumber;
+  String? panNumber;
+  String? contactPerson;
+  String? contactPhone;
+  String? contactEmail;
   List<String> caEmails; // List of CA emails who can access this company
   DateTime createdAt;
   DateTime updatedAt;
@@ -20,8 +29,17 @@ class Company {
     required this.adminName,
     this.description,
     this.address,
+    this.city,
+    this.state,
+    this.pincode,
     this.phoneNumber,
+    this.email,
     this.website,
+    this.gstNumber,
+    this.panNumber,
+    this.contactPerson,
+    this.contactPhone,
+    this.contactEmail,
     required this.caEmails,
     required this.createdAt,
     required this.updatedAt,
@@ -36,8 +54,17 @@ class Company {
       adminName: data['adminName'] ?? '',
       description: data['description'],
       address: data['address'],
+      city: data['city'],
+      state: data['state'],
+      pincode: data['pincode'],
       phoneNumber: data['phoneNumber'],
+      email: data['email'],
       website: data['website'],
+      gstNumber: data['gstNumber'],
+      panNumber: data['panNumber'],
+      contactPerson: data['contactPerson'],
+      contactPhone: data['contactPhone'],
+      contactEmail: data['contactEmail'],
       caEmails: List<String>.from(data['caEmails'] ?? []),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
@@ -51,8 +78,17 @@ class Company {
       'adminName': adminName,
       'description': description,
       'address': address,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
       'phoneNumber': phoneNumber,
+      'email': email,
       'website': website,
+      'gstNumber': gstNumber,
+      'panNumber': panNumber,
+      'contactPerson': contactPerson,
+      'contactPhone': contactPhone,
+      'contactEmail': contactEmail,
       'caEmails': caEmails,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -65,8 +101,17 @@ class Company {
     String? adminName,
     String? description,
     String? address,
+    String? city,
+    String? state,
+    String? pincode,
     String? phoneNumber,
+    String? email,
     String? website,
+    String? gstNumber,
+    String? panNumber,
+    String? contactPerson,
+    String? contactPhone,
+    String? contactEmail,
     List<String>? caEmails,
     DateTime? updatedAt,
   }) {
@@ -77,8 +122,17 @@ class Company {
       adminName: adminName ?? this.adminName,
       description: description ?? this.description,
       address: address ?? this.address,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      pincode: pincode ?? this.pincode,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      email: email ?? this.email,
       website: website ?? this.website,
+      gstNumber: gstNumber ?? this.gstNumber,
+      panNumber: panNumber ?? this.panNumber,
+      contactPerson: contactPerson ?? this.contactPerson,
+      contactPhone: contactPhone ?? this.contactPhone,
+      contactEmail: contactEmail ?? this.contactEmail,
       caEmails: caEmails ?? this.caEmails,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

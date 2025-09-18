@@ -24,8 +24,17 @@ class _SignupScreenState extends State<SignupScreen> {
   String _adminName = '';
   String _companyDescription = '';
   String _companyAddress = '';
+  String _companyCity = '';
+  String _companyState = '';
+  String _companyPincode = '';
   String _companyPhone = '';
+  String _companyEmail = '';
   String _companyWebsite = '';
+  String _gstNumber = '';
+  String _panNumber = '';
+  String _contactPerson = '';
+  String _contactPhone = '';
+  String _contactEmail = '';
   
   int _currentStep = 0;
   bool _isLoading = false;
@@ -36,7 +45,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text('Create Company Account (${_currentStep + 1}/2)'),
+        title: Text('Create Company Account (${_currentStep + 1}/3)'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: const Color(0xFF6366F1),
@@ -49,6 +58,7 @@ class _SignupScreenState extends State<SignupScreen> {
           children: [
             _buildAccountStep(),
             _buildCompanyStep(),
+            _buildContactStep(),
           ],
         ),
       ),
@@ -385,6 +395,114 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
 
+          // City, State, Pincode Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'City',
+                      hintText: 'City',
+                      prefixIcon: Icon(Icons.location_city_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    onChanged: (val) => _companyCity = val.trim(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'State',
+                      hintText: 'State',
+                      prefixIcon: Icon(Icons.map_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    onChanged: (val) => _companyState = val.trim(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Pincode',
+                      hintText: 'Pincode',
+                      prefixIcon: Icon(Icons.pin_drop_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) => _companyPincode = val.trim(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // GST and PAN Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'GST Number',
+                      hintText: 'GST Number (optional)',
+                      prefixIcon: Icon(Icons.receipt_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    onChanged: (val) => _gstNumber = val.trim(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'PAN Number',
+                      hintText: 'PAN Number (optional)',
+                      prefixIcon: Icon(Icons.credit_card_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    onChanged: (val) => _panNumber = val.trim(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           // Company Phone (Optional)
           _buildInputCard(
             child: TextFormField(
@@ -401,6 +519,26 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               keyboardType: TextInputType.phone,
               onChanged: (val) => _companyPhone = val.trim(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Company Email (Optional)
+          _buildInputCard(
+            child: TextFormField(
+              decoration: const InputDecoration(
+                labelText: 'Company Email',
+                hintText: 'Enter company email (optional)',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              keyboardType: TextInputType.emailAddress,
+              onChanged: (val) => _companyEmail = val.trim(),
             ),
           ),
           const SizedBox(height: 16),
@@ -450,9 +588,9 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Create Account Button
+          // Next Button
               ElevatedButton(
-                onPressed: _isLoading ? null : _handleSignup,
+                onPressed: _isLoading ? null : _nextStep,
                 style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF10B981),
               foregroundColor: Colors.white,
@@ -471,7 +609,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                       )
                     : const Text(
-                    'Create Company Account',
+                    'Next: Contact Details',
                         style: TextStyle(
                       fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -501,6 +639,208 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ],
           ),
+    );
+  }
+
+  Widget _buildContactStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.contact_phone,
+                    size: 40,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Contact Person Details',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add contact person information (optional)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Contact Person Name (Optional)
+          _buildInputCard(
+            child: TextFormField(
+              decoration: const InputDecoration(
+                labelText: 'Contact Person Name',
+                hintText: 'Enter contact person name (optional)',
+                prefixIcon: Icon(Icons.person_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              onChanged: (val) => _contactPerson = val.trim(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Contact Phone and Email Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Contact Phone',
+                      hintText: 'Contact phone (optional)',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.phone,
+                    onChanged: (val) => _contactPhone = val.trim(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputCard(
+                  child: TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Contact Email',
+                      hintText: 'Contact email (optional)',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    onChanged: (val) => _contactEmail = val.trim(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // Error Message
+          if (_error != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: Colors.red.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Create Account Button
+          ElevatedButton(
+            onPressed: _isLoading ? null : _handleSignup,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text(
+                    'Create Company Account',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 16),
+
+          // Back Button
+          OutlinedButton(
+            onPressed: _isLoading ? null : _previousStep,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF6366F1)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Back to Company Details',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6366F1),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -549,6 +889,25 @@ class _SignupScreenState extends State<SignupScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    } else if (_currentStep == 1) {
+      // Validate company details
+      if (_companyName.isEmpty) {
+        setState(() => _error = 'Please enter your company name');
+        return;
+      }
+      if (_adminName.isEmpty) {
+        setState(() => _error = 'Please enter your full name');
+        return;
+      }
+
+      setState(() {
+        _currentStep = 2;
+        _error = null;
+      });
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -556,6 +915,15 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_currentStep == 1) {
       setState(() {
         _currentStep = 0;
+        _error = null;
+      });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else if (_currentStep == 2) {
+      setState(() {
+        _currentStep = 1;
         _error = null;
       });
       _pageController.previousPage(
@@ -594,17 +962,30 @@ class _SignupScreenState extends State<SignupScreen> {
       );
 
       if (success) {
-        // Then create the company
-        final companySuccess = await authProvider.createCompanyForAdmin(
+        // Then create the company with all details
+        final companySuccess = await authProvider.createCompanyForAdminWithDetails(
           _companyName,
           _adminName,
+          _companyDescription.isEmpty ? null : _companyDescription,
+          _companyAddress.isEmpty ? null : _companyAddress,
+          _companyCity.isEmpty ? null : _companyCity,
+          _companyState.isEmpty ? null : _companyState,
+          _companyPincode.isEmpty ? null : _companyPincode,
+          _companyPhone.isEmpty ? null : _companyPhone,
+          _companyEmail.isEmpty ? null : _companyEmail,
+          _companyWebsite.isEmpty ? null : _companyWebsite,
+          _gstNumber.isEmpty ? null : _gstNumber,
+          _panNumber.isEmpty ? null : _panNumber,
+          _contactPerson.isEmpty ? null : _contactPerson,
+          _contactPhone.isEmpty ? null : _contactPhone,
+          _contactEmail.isEmpty ? null : _contactEmail,
         );
 
         if (companySuccess) {
           // Navigate to admin dashboard
-        Navigator.pushReplacementNamed(context, '/admin_dashboard');
-      } else {
-        setState(() {
+          Navigator.pushReplacementNamed(context, '/admin_dashboard');
+        } else {
+          setState(() {
             _error = 'Account created but failed to create company. Please contact support.';
           });
         }

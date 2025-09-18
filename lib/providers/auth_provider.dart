@@ -302,6 +302,69 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Create company with all details during admin signup
+  Future<bool> createCompanyForAdminWithDetails(
+    String companyName,
+    String adminName,
+    String? description,
+    String? address,
+    String? city,
+    String? state,
+    String? pincode,
+    String? phoneNumber,
+    String? email,
+    String? website,
+    String? gstNumber,
+    String? panNumber,
+    String? contactPerson,
+    String? contactPhone,
+    String? contactEmail,
+  ) async {
+    if (_user == null) return false;
+    
+    try {
+      final now = DateTime.now();
+      final companyData = {
+        'name': companyName,
+        'adminEmail': _user!.email!,
+        'adminName': adminName,
+        'description': description,
+        'address': address,
+        'city': city,
+        'state': state,
+        'pincode': pincode,
+        'phoneNumber': phoneNumber,
+        'email': email,
+        'website': website,
+        'gstNumber': gstNumber,
+        'panNumber': panNumber,
+        'contactPerson': contactPerson,
+        'contactPhone': contactPhone,
+        'contactEmail': contactEmail,
+        'caEmails': <String>[],
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
+
+      final companyDoc = await _firestore.collection('companies').add(companyData);
+      
+      // Update user with company ID
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'companyId': companyDoc.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _companyId = companyDoc.id;
+      await _loadSelectedCompany(companyDoc.id);
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Error creating company with details: $e');
+      return false;
+    }
+  }
+
 
   void logout() {
     signOut();
