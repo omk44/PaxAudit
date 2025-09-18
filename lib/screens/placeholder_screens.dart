@@ -136,10 +136,13 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
     final auth = Provider.of<AuthProvider>(context);
     final hasData = bankStatementProvider.bankStatements.isNotEmpty;
 
-    // Load data if not already loaded
+    // Load data if not already loaded - prevent infinite loop
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final companyId = auth.companyId ?? auth.selectedCompany?.id;
-      if (companyId != null && bankStatementProvider.bankStatements.isEmpty && !bankStatementProvider.isLoading) {
+      if (companyId != null && 
+          bankStatementProvider.bankStatements.isEmpty && 
+          !bankStatementProvider.isLoading &&
+          bankStatementProvider.error == null) {
         await bankStatementProvider.loadBankStatementsForCompany(companyId);
       }
     });
@@ -172,11 +175,48 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
               foregroundColor: Colors.white,
             )
           : null,
-      body: hasData
-          ? Column(
-              children: [
-                Expanded(
-                  child: RefreshIndicator(
+      body: Column(
+        children: [
+          // Show error if loading failed
+          if (bankStatementProvider.error != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Error: ${bankStatementProvider.error}',
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+                      if (companyId != null) {
+                        Provider.of<BankStatementProvider>(context, listen: false)
+                            .loadBankStatementsForCompany(companyId);
+                      }
+                    },
+                    child: const Text('Retry', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Main content
+          Expanded(
+            child: hasData
+                ? RefreshIndicator(
                     onRefresh: () async {
                       final auth = Provider.of<AuthProvider>(
                         context,
@@ -204,98 +244,142 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: bankStatement.status.color.withOpacity(
-                                  0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: bankStatement.status.color,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  bankStatement.status.icon,
-                                  style: const TextStyle(fontSize: 24),
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              bankStatement.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            subtitle: Column(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Bank: ${bankStatement.bankName}',
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Range: ${_formatShortDate(bankStatement.statementStartDate)} - ${_formatShortDate(bankStatement.statementEndDate)}',
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                                const SizedBox(height: 8),
+                                // Header row with status icon and title
                                 Row(
                                   children: [
-                                    Icon(
-                                      Icons.circle,
-                                      size: 8,
-                                      color: bankStatement.status.color,
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: bankStatement.status.color.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: bankStatement.status.color,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          bankStatement.status.icon,
+                                          style: const TextStyle(fontSize: 20),
+                                        ),
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Status: ${bankStatement.status.displayName}',
-                                      style: TextStyle(
-                                        color: bankStatement.status.color,
-                                        fontWeight: FontWeight.w600,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            bankStatement.title,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Bank: ${bankStatement.bankName}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Created: ${_formatDate(bankStatement.createdAt)}',
-                                  style: const TextStyle(color: Colors.grey),
+                                const SizedBox(height: 12),
+                                
+                                // Date range and status
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${_formatShortDate(bankStatement.statementStartDate)} - ${_formatShortDate(bankStatement.statementEndDate)}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.blue),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: bankStatement.status.color.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.circle,
+                                            size: 8,
+                                            color: bankStatement.status.color,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            bankStatement.status.displayName,
+                                            style: TextStyle(
+                                              color: bankStatement.status.color,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 8),
+                                
+                                // Created info
                                 Text(
-                                  'By: ${bankStatement.uploadedBy}',
-                                  style: const TextStyle(color: Colors.grey),
+                                  'Created: ${_formatDate(bankStatement.createdAt)} by ${bankStatement.uploadedBy}',
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                                 ),
+                                
+                                // Comments if any
                                 if (bankStatement.caComments != null) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 8),
                                   Container(
+                                    width: double.infinity,
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: Colors.green.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Row(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(
-                                          Icons.comment,
-                                          size: 16,
-                                          color: Colors.green,
+                                        const Text(
+                                          'CA Comments:',
+                                          style: TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'CA: ${bankStatement.caComments}',
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontSize: 12,
-                                            ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          bankStatement.caComments!,
+                                          style: const TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ],
@@ -303,148 +387,160 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                   ),
                                 ],
                                 if (bankStatement.adminComments != null) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 8),
                                   Container(
+                                    width: double.infinity,
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: Colors.orange.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Row(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(
-                                          Icons.admin_panel_settings,
-                                          size: 16,
-                                          color: Colors.orange,
+                                        const Text(
+                                          'Admin Comments:',
+                                          style: TextStyle(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'Admin: ${bankStatement.adminComments}',
-                                            style: const TextStyle(
-                                              color: Colors.orange,
-                                              fontSize: 12,
-                                            ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          bankStatement.adminComments!,
+                                          style: const TextStyle(
+                                            color: Colors.orange,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.visibility),
-                                  onPressed: () => _openPdf(bankStatement.linkUrl),
-                                  tooltip: 'Open Link',
-                                  color: Colors.blue,
-                                ),
-                                if (auth.role == 'admin')
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => _addOrEditLink(existing: bankStatement),
-                                    tooltip: 'Edit Link (Admin)',
-                                    color: Colors.green,
-                                  ),
-                                if (auth.role == 'ca')
-                                  IconButton(
-                                    icon: const Icon(Icons.rate_review),
-                                    onPressed: () => _caReview(bankStatement),
-                                    tooltip: 'CA Review',
-                                    color: Colors.orange,
-                                  ),
-                                IconButton(
-                                  icon: const Icon(Icons.history),
-                                  onPressed: () => showDialog(
-                                    context: context,
-                                    builder: (_) => BankStatementHistoryDialog(
-                                      bankStatement: bankStatement,
+                                
+                                const SizedBox(height: 12),
+                                
+                                // Action buttons
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.visibility, size: 20),
+                                      onPressed: () => _openPdf(bankStatement.linkUrl),
+                                      tooltip: 'Open Link',
+                                      color: Colors.blue,
+                                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                                     ),
-                                  ),
-                                  tooltip: 'View History',
-                                  color: Colors.grey,
+                                    if (auth.role == 'admin')
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, size: 20),
+                                        onPressed: () => _addOrEditLink(existing: bankStatement),
+                                        tooltip: 'Edit Link',
+                                        color: Colors.green,
+                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      ),
+                                    if (auth.role == 'ca')
+                                      IconButton(
+                                        icon: const Icon(Icons.rate_review, size: 20),
+                                        onPressed: () => _caReview(bankStatement),
+                                        tooltip: 'CA Review',
+                                        color: Colors.orange,
+                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      ),
+                                    IconButton(
+                                      icon: const Icon(Icons.history, size: 20),
+                                      onPressed: () => showDialog(
+                                        context: context,
+                                        builder: (_) => BankStatementHistoryDialog(
+                                          bankStatement: bankStatement,
+                                        ),
+                                      ),
+                                      tooltip: 'View History',
+                                      color: Colors.grey,
+                                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                    ),
+                                    if (auth.role == 'admin')
+                                      IconButton(
+                                        icon: const Icon(Icons.admin_panel_settings, size: 20),
+                                        onPressed: () => _adminFinalReview(bankStatement),
+                                        tooltip: 'Admin Review',
+                                        color: Colors.purple,
+                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      ),
+                                    if (auth.role == 'admin')
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, size: 20),
+                                        onPressed: () => _deleteBankStatement(bankStatement.id),
+                                        tooltip: 'Delete',
+                                        color: Colors.red,
+                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      ),
+                                  ],
                                 ),
-                                if (auth.role == 'admin')
-                                  IconButton(
-                                    icon: const Icon(Icons.admin_panel_settings),
-                                    onPressed: () => _adminFinalReview(bankStatement),
-                                    tooltip: 'Admin Final Review',
-                                    color: Colors.purple,
-                                  ),
-                                if (auth.role == 'admin')
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () =>
-                                        _deleteBankStatement(bankStatement.id),
-                                    tooltip: 'Delete',
-                                    color: Colors.red,
-                                  ),
                               ],
                             ),
                           ),
                         );
                       },
                     ),
-                  ),
-                ),
-                const SizedBox(height: 72),
-              ],
-            )
-      : Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(60),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(60),
+                          ),
+                          child: const Icon(
+                            Icons.description_outlined,
+                            size: 64,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'No Bank Statements Yet',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Add bank statement links for CA review',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () => _addOrEditLink(),
+                          icon: const Icon(Icons.add_link),
+                          label: const Text('Add First Link'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.description_outlined,
-                      size: 64,
-                      color: Colors.blue,
-                    ),
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'No Bank Statements Yet',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Add bank statement links for CA review',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _addOrEditLink(),
-                    icon: const Icon(Icons.add_link),
-                    label: const Text('Add First Link'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          ),
+        ],
+      ),
     );
   }
 

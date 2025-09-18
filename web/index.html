@@ -31,17 +31,6 @@
 
   <title>pax_audit_frontend</title>
   <link rel="manifest" href="manifest.json">
-  
-  <!-- Prevent JavaScript interop issues -->
-  <script>
-    window.addEventListener('error', function(e) {
-      if (e.message && e.message.includes('LegacyJavaScriptObject')) {
-        console.warn('Suppressed LegacyJavaScriptObject error:', e.message);
-        e.preventDefault();
-        return false;
-      }
-    });
-  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
