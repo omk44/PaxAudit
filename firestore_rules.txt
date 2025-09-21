@@ -30,5 +30,16 @@ service cloud.firestore {
     match /incomes/{incomeId} {
       allow read, write: if request.auth != null;
     }
+    
+    // Allow all authenticated users to manage bank statements
+    match /bank_statements/{bankStatementId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow all authenticated users to manage notifications
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+
   }
 }

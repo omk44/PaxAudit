@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/income.dart';
+import 'notification_provider.dart';
 
 class IncomeProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -150,10 +151,194 @@ class IncomeProvider extends ChangeNotifier {
           .doc(income.id)
           .update(incomeWithHistory.toFirestore());
 
+
+  void addIncome({
+    required double amount,
+    required DateTime date,
+    required String addedBy,
+  }) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final now = DateTime.now();
+    final income = Income(
+      id: id,
+      amount: amount,
+      date: date,
+      addedBy: addedBy,
+      history: [IncomeEditHistory(
+        amount: amount,
+        editedBy: addedBy,
+        timestamp: now,
+      )],
+    );
+    _incomes.add(income);
+  // Calculate total income amount
+  double get totalIncome =>
+      _incomes.fold(0.0, (sum, income) => sum + income.amount);
+
+  // Load incomes for a specific company
+  Future<void> loadIncomesForCompany(String companyId) async {
+    // Don't reload if already loaded for the same company and not currently loading
+    if (_currentCompanyId == companyId && _incomes.isNotEmpty && !_isLoading) {
+      print('Incomes already loaded for company: $companyId, skipping reload');
+      return;
+    }
+
+    // Don't reload if already loading for the same company
+    if (_currentCompanyId == companyId && _isLoading) {
+      print(
+        'Already loading incomes for company: $companyId, skipping duplicate load',
+      );
+      return;
+    }
+
+    try {
+      print('Loading incomes for company: $companyId');
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final snapshot = await _firestore
+          .collection('incomes')
+          .where('companyId', isEqualTo: companyId)
+          .orderBy('date', descending: true)
+          .get();
+
+      print(
+        'Found ${snapshot.docs.length} income records for company $companyId',
+      );
+
+      // Only clear if switching to a different company
+      if (_currentCompanyId != companyId) {
+        _incomes.clear();
+      }
+
+      // Add incomes from Firestore, avoiding duplicates
+      for (final doc in snapshot.docs) {
+        final income = Income.fromFirestore(doc);
+        final existingIndex = _incomes.indexWhere((i) => i.id == income.id);
+        if (existingIndex == -1) {
+          _incomes.add(income);
+        }
+      }
+      _currentCompanyId = companyId;
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      print('Error loading incomes for company $companyId: $e');
+      _error = 'Failed to load incomes: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Add a new income
+  Future<bool> addIncome(Income income) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final docRef = await _firestore
+          .collection('incomes')
+          .add(income.toFirestore());
+
+      // Add to local list with the generated ID (only if not already present)
+      final createdIncome = income.copyWith();
+
+      // Check if income already exists to prevent duplicates
+      final existingIndex = _incomes.indexWhere((i) => i.id == docRef.id);
+      if (existingIndex == -1) {
+        _incomes.insert(
+          0,
+          Income(
+            id: docRef.id,
+            amount: createdIncome.amount,
+            description: createdIncome.description,
+            category: createdIncome.category,
+            date: createdIncome.date,
+            addedBy: createdIncome.addedBy,
+            paymentMethod: createdIncome.paymentMethod,
+            transactionId: createdIncome.transactionId,
+            history: createdIncome.history,
+            companyId: createdIncome.companyId,
+          ),
+        ); // Insert at beginning for recent first
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to add income: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Update an income
+  Future<bool> updateIncome(Income income, {required String editedBy}) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      // Preserve original creator if present in local cache
+      final indexExisting = _incomes.indexWhere((i) => i.id == income.id);
+      final preserved = indexExisting == -1
+          ? income
+          : income.copyWith(addedBy: _incomes[indexExisting].addedBy);
+
+      // Append edit history entry before update
+      final updatedHistory = List<IncomeEditHistory>.from(preserved.history)
+        ..add(
+          IncomeEditHistory(
+            amount: preserved.amount,
+            description: preserved.description,
+            category: preserved.category,
+            editedBy: editedBy,
+            timestamp: DateTime.now(),
+          ),
+        );
+
+      final incomeWithHistory = preserved.copyWith(history: updatedHistory);
+
+      await _firestore
+          .collection('incomes')
+          .doc(income.id)
+          .update(incomeWithHistory.toFirestore());
+
+
       // Update local list
       final index = _incomes.indexWhere((i) => i.id == income.id);
       if (index != -1) {
         _incomes[index] = incomeWithHistory;
+      }
+
+      // Send notification to CAs (if admin made the change)
+      await NotificationProvider.sendNotificationToCAs(
+        action: 'updated',
+        companyId: income.companyId,
+        performedBy: editedBy,
+        itemDescription: income.description,
+        amount: income.amount,
+        itemType: 'income',
+        itemId: income.id,
+      );
+
+      // Send notification to admin (if CA made the change)
+      // Check if the editedBy is a CA email (contains @ and is not admin)
+      if (editedBy.contains('@') && !editedBy.contains('admin')) {
+        await NotificationProvider.sendNotificationToAdmin(
+          action: 'updated',
+          companyId: income.companyId,
+          performedBy: editedBy,
+          itemDescription: income.description,
+          amount: income.amount,
+          itemType: 'income',
+          itemId: income.id,
+        );
       }
 
       _isLoading = false;
@@ -173,6 +358,22 @@ class IncomeProvider extends ChangeNotifier {
       _isLoading = true;
       _error = null;
       notifyListeners();
+
+      // Get income details before deleting for notification
+      final income = getIncomeById(id);
+      if (income != null) {
+        // Send notification to CAs before deleting
+        await NotificationProvider.sendNotificationToCAs(
+          action: 'deleted',
+          companyId: income.companyId,
+          performedBy: 'Admin', // You might want to pass this as a parameter
+          itemDescription: income.description,
+          amount: income.amount,
+          itemType: 'income',
+          itemId: income.id,
+        );
+      }
+
 
       await _firestore.collection('incomes').doc(id).delete();
 

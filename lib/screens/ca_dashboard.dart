@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/bank_statement_provider.dart';
+import '../providers/notification_provider.dart';
+
 import 'management_screens.dart';
+import 'notification_screen.dart';
 
 class CADashboard extends StatefulWidget {
   const CADashboard({super.key});
 
   @override
+
   State<CADashboard> createState() => _CADashboardState();
 }
 
@@ -64,16 +69,58 @@ class _CADashboardState extends State<CADashboard> {
         ).loadBankStatementsForCompany(companyId),
       ]);
 
+      // Load notifications for the current CA
+      final caEmail = auth.user?.email;
+      if (caEmail != null) {
+        await Provider.of<NotificationProvider>(
+          context,
+          listen: false,
+        ).loadNotificationsForCA(caEmail);
+      }
+
+
       _lastLoadedCompanyId = companyId;
     }
   }
 
-  @override
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('CA Dashboard'),
         actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, notificationProvider, child) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_rounded),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (notificationProvider.hasUnreadNotifications)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -83,6 +130,38 @@ class _CADashboardState extends State<CADashboard> {
           ),
         ],
       ),
+
+      body: ListView(
+        children: [
+          ListTile(
+            title: const Text('CA Details'),
+            onTap: () => Navigator.pushNamed(context, '/ca_details'),
+          ),
+          ListTile(
+            title: const Text('Income/Expense Viewer'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
+            ),
+          ),
+          ListTile(
+            title: const Text('Income Management'),
+            onTap: () => Navigator.pushNamed(context, '/income_management'),
+          ),
+          ListTile(
+            title: const Text('Expense Management'),
+            onTap: () => Navigator.pushNamed(context, '/expense_management'),
+          ),
+          ListTile(
+            title: const Text('Tax Summary'),
+            onTap: () => Navigator.pushNamed(context, '/tax_summary'),
+          ),
+          ListTile(
+            title: const Text('Bank Statements'),
+            onTap: () => Navigator.pushNamed(context, '/bank_statements'),
+          ),
+        ],
+
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -149,6 +228,38 @@ class _CADashboardState extends State<CADashboard> {
                 subtitle: const Text('View uploaded bank statements'),
                 onTap: () => Navigator.pushNamed(context, '/bank_statements'),
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(
+                  Icons.bug_report_rounded,
+                  color: Colors.orange,
+                ),
+                title: const Text('Test Notification'),
+                subtitle: const Text(
+                  'Create a test notification to verify system',
+                ),
+                onTap: () async {
+                  final auth = Provider.of<AuthProvider>(
+                    context,
+                    listen: false,
+                  );
+                  final notificationProvider =
+                      Provider.of<NotificationProvider>(context, listen: false);
+                  final caEmail = auth.user?.email;
+                  if (caEmail != null) {
+                    await notificationProvider.createTestNotification(caEmail);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Test notification created!'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        },
+
             ],
           );
         },

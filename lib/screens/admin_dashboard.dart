@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ca_provider.dart';
 import '../providers/bank_statement_provider.dart';
+import '../providers/notification_provider.dart';
+
 import 'management_screens.dart';
+import 'notification_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -65,16 +69,60 @@ class _AdminDashboardState extends State<AdminDashboard> {
           listen: false,
         ).loadBankStatementsForCompany(companyId),
       ]);
+
+      // Load notifications for the current admin
+      final adminEmail = auth.user?.email;
+      if (adminEmail != null) {
+        await Provider.of<NotificationProvider>(
+          context,
+          listen: false,
+        ).loadNotificationsForCA(adminEmail);
+      }
+
       _lastLoadedCompanyId = companyId;
     }
   }
 
   @override
+
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, notificationProvider, child) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_rounded),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (notificationProvider.hasUnreadNotifications)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -84,6 +132,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
+
+      body: ListView(
+        children: [
+          ListTile(
+            title: const Text('CA Management'),
+            onTap: () => Navigator.pushNamed(context, '/ca_management'),
+          ),
+          ListTile(
+            title: const Text('Category Management'),
+            onTap: () => Navigator.pushNamed(context, '/category_management'),
+          ),
+          ListTile(
+            title: const Text('Income/Expense Viewer'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
+            ),
+          ),
+          ListTile(
+            title: const Text('Income Management'),
+            onTap: () => Navigator.pushNamed(context, '/income_management'),
+          ),
+          ListTile(
+            title: const Text('Expense Management'),
+            onTap: () => Navigator.pushNamed(context, '/expense_management'),
+          ),
+          ListTile(
+            title: const Text('Tax Summary'),
+            onTap: () => Navigator.pushNamed(context, '/tax_summary'),
+          ),
+          ListTile(
+            title: const Text('Bank Statements'),
+            onTap: () => Navigator.pushNamed(context, '/bank_statements'),
+          ),
+        ],
+
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -100,6 +184,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ListTile(
                 leading: const Icon(Icons.person, color: Colors.purple),
                 title: const Text('Admin Profile'),
+                subtitle: const Text(
+                  'Edit company details and profile information',
+                ),
                 subtitle: const Text('Edit company details and profile information'),
                 onTap: () => Navigator.pushNamed(context, '/admin_profile'),
               ),
@@ -170,6 +257,40 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 title: const Text('Bank Statements'),
                 onTap: () => Navigator.pushNamed(context, '/bank_statements'),
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(
+                  Icons.bug_report_rounded,
+                  color: Colors.orange,
+                ),
+                title: const Text('Test Notification'),
+                subtitle: const Text(
+                  'Create a test notification to verify system',
+                ),
+                onTap: () async {
+                  final auth = Provider.of<AuthProvider>(
+                    context,
+                    listen: false,
+                  );
+                  final notificationProvider =
+                      Provider.of<NotificationProvider>(context, listen: false);
+                  final adminEmail = auth.user?.email;
+                  if (adminEmail != null) {
+                    await notificationProvider.createTestNotification(
+                      adminEmail,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Test notification created!'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        },
+
             ],
           );
         },

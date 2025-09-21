@@ -53,10 +53,63 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
   Widget build(BuildContext context) {
     final caProvider = Provider.of<CAProvider>(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('CA Management')),
+      appBar: AppBar(
+        title: const Text('CA Management'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync, color: Colors.orange),
+            onPressed: () async {
+              // Fix all data consistency
+              final success = await caProvider.fixAllDataConsistency();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'All data consistency fixed successfully!'
+                          : 'Some fixes failed: ${caProvider.error}',
+                    ),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
+
+            child: ListView.builder(
+              itemCount: caProvider.cas.length,
+              itemBuilder: (context, index) {
+                final ca = caProvider.cas[index];
+                return ListTile(
+                  title: Text(ca.username),
+                  subtitle: Text('ID: ${ca.id}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => CAEditDialog(ca: ca),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () {
+                          caProvider.deleteCA(ca.id);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
             child: RefreshIndicator(
               onRefresh: _refresh,
               child: ListView.builder(
@@ -71,6 +124,29 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.sync, color: Colors.blue),
+                          onPressed: () async {
+                            // Fix specific CA consistency
+                            final success = await caProvider
+                                .fixCASpecificConsistency(ca.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    success
+                                        ? 'CA consistency fixed successfully!'
+                                        : 'Failed to fix CA consistency: ${caProvider.error}',
+                                  ),
+                                  backgroundColor: success
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        IconButton(
+
                           icon: const Icon(Icons.edit),
                           onPressed: () {
                             showDialog(
@@ -90,6 +166,7 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                   );
                 },
               ),
+
             ),
           ),
           Padding(

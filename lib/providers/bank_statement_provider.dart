@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/bank_statement.dart';
+import 'notification_provider.dart';
 
 class BankStatementProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -16,7 +17,9 @@ class BankStatementProvider extends ChangeNotifier {
 
   // Load bank statements for a specific company
   Future<void> loadBankStatementsForCompany(String companyId) async {
-    final switchingCompany = _currentCompanyId != null && _currentCompanyId != companyId;
+    final switchingCompany =
+        _currentCompanyId != null && _currentCompanyId != companyId;
+
 
     // Don't reload if already loading for the same company
     if (_currentCompanyId == companyId && _isLoading) {
@@ -138,7 +141,9 @@ class BankStatementProvider extends ChangeNotifier {
       notifyListeners();
 
       final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
-      final updatedHistory = List<BankStatementHistory>.from(bankStatement.history);
+      final updatedHistory = List<BankStatementHistory>.from(
+        bankStatement.history,
+      );
 
       updatedHistory.add(
         BankStatementHistory(
@@ -191,7 +196,9 @@ class BankStatementProvider extends ChangeNotifier {
       notifyListeners();
 
       final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
-      final updatedHistory = List<BankStatementHistory>.from(bankStatement.history);
+      final updatedHistory = List<BankStatementHistory>.from(
+        bankStatement.history,
+      );
 
       updatedHistory.add(
         BankStatementHistory(
@@ -283,6 +290,16 @@ class BankStatementProvider extends ChangeNotifier {
         _bankStatements[index] = updatedBankStatement;
       }
 
+      // Send notification to CAs
+      await _sendNotificationToCAs(
+        action: action,
+        companyId: bankStatement.companyId,
+        performedBy: updatedBy,
+        bankStatementTitle: bankStatement.title,
+        bankStatementId: bankStatement.id,
+        comments: comments,
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -327,9 +344,10 @@ class BankStatementProvider extends ChangeNotifier {
         ],
       );
 
-      await _firestore.collection('bank_statements').doc(id).update(
-            updated.toFirestore(),
-          );
+      await _firestore
+          .collection('bank_statements')
+          .doc(id)
+          .update(updated.toFirestore());
 
       final index = _bankStatements.indexWhere((bs) => bs.id == id);
       if (index != -1) _bankStatements[index] = updated;
@@ -352,6 +370,18 @@ class BankStatementProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Get bank statement details before deleting for notification
+      final bankStatement = _bankStatements.firstWhere((bs) => bs.id == id);
+
+      // Send notification to CAs before deleting
+      await _sendNotificationToCAs(
+        action: 'deleted',
+        companyId: bankStatement.companyId,
+        performedBy: 'Admin', // You might want to pass this as a parameter
+        bankStatementTitle: bankStatement.title,
+        bankStatementId: bankStatement.id,
+      );
+
       // Delete from Firestore
       await _firestore.collection('bank_statements').doc(id).delete();
 
@@ -368,6 +398,55 @@ class BankStatementProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  // Helper method to get CA emails for a company
+  Future<List<String>> _getCAEmailsForCompany(String companyId) async {
+    try {
+      final companyDoc = await _firestore
+          .collection('companies')
+          .doc(companyId)
+          .get();
+      if (companyDoc.exists) {
+        final data = companyDoc.data() as Map<String, dynamic>;
+        final caEmails = data['caEmails'] as List<dynamic>?;
+        return caEmails?.cast<String>() ?? [];
+      }
+      return [];
+    } catch (e) {
+      print('Error getting CA emails: $e');
+      return [];
+    }
+  }
+
+  // Helper method to send notifications to CAs
+  Future<void> _sendNotificationToCAs({
+    required String action,
+    required String companyId,
+    required String performedBy,
+    required String bankStatementTitle,
+    String? bankStatementId,
+    String? comments,
+  }) async {
+    try {
+      final caEmails = await _getCAEmailsForCompany(companyId);
+      final notificationProvider = NotificationProvider();
+
+      for (final caEmail in caEmails) {
+        await notificationProvider.notifyBankStatementChange(
+          action: action,
+          companyId: companyId,
+          caEmail: caEmail,
+          performedBy: performedBy,
+          bankStatementTitle: bankStatementTitle,
+          bankStatementId: bankStatementId,
+          comments: comments,
+        );
+      }
+    } catch (e) {
+      print('Error sending notifications: $e');
+    }
+  }
+
 
   // Clear all bank statements (useful for logout)
   void clearBankStatements() {
