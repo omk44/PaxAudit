@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../models/ca.dart';
 import '../providers/auth_provider.dart';
 import '../providers/ca_provider.dart';
 import '../providers/category_provider.dart';
@@ -49,6 +50,87 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
     }
   }
 
+  Future<void> _deleteCA(
+    BuildContext context,
+    CAProvider caProvider,
+    CA ca,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete CA'),
+        content: Text(
+          'Are you sure you want to delete ${ca.name} (${ca.email})? This action will:\n\n'
+          '• Remove the CA from all companies\n'
+          '• Delete the CA account\n'
+          '• Remove all associated data\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Check Firebase connectivity first
+        final isConnected = await caProvider.checkFirebaseConnectivity();
+        if (!isConnected) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Firebase connectivity issue: ${caProvider.error}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        final success = await caProvider.deleteCA(ca.id);
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('CA ${ca.name} deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Refresh the list
+          _refresh();
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to delete CA: ${caProvider.error ?? 'Unknown error'}',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting CA: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final caProvider = Provider.of<CAProvider>(context);
@@ -59,6 +141,22 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
           IconButton(
             icon: const Icon(Icons.sync, color: Colors.orange),
             onPressed: () async {
+              // Check Firebase connectivity first
+              final isConnected = await caProvider.checkFirebaseConnectivity();
+              if (!isConnected) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Firebase connectivity issue: ${caProvider.error}',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+                return;
+              }
+
               // Fix all data consistency
               final success = await caProvider.fixAllDataConsistency();
               if (mounted) {
@@ -96,6 +194,23 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                         IconButton(
                           icon: const Icon(Icons.sync, color: Colors.blue),
                           onPressed: () async {
+                            // Check Firebase connectivity first
+                            final isConnected = await caProvider
+                                .checkFirebaseConnectivity();
+                            if (!isConnected) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Firebase connectivity issue: ${caProvider.error}',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
                             // Fix specific CA consistency
                             final success = await caProvider
                                 .fixCASpecificConsistency(ca.id);
@@ -126,9 +241,7 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            caProvider.deleteCA(ca.id);
-                          },
+                          onPressed: () => _deleteCA(context, caProvider, ca),
                         ),
                       ],
                     ),

@@ -6,7 +6,7 @@ import '../models/ca.dart';
 
 class CAProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   final List<CA> _cas = [];
   bool _isLoading = false;
   String? _error;
@@ -86,7 +86,7 @@ class CAProvider extends ChangeNotifier {
       );
 
       final docRef = await _firestore.collection('cas').add(ca.toFirestore());
-      
+
       // Add to local list with the generated ID
       final createdCA = CA(
         id: docRef.id,
@@ -98,7 +98,7 @@ class CAProvider extends ChangeNotifier {
         createdAt: now,
         updatedAt: now,
       );
-      
+
       _cas.add(createdCA);
 
       _isLoading = false;
@@ -140,33 +140,48 @@ class CAProvider extends ChangeNotifier {
       );
 
       final docRef = await _firestore.collection('cas').add(ca.toFirestore());
-      
+
       // Create Firebase Auth user for the CA using secondary app to avoid affecting admin session
-      final secondaryApp = await Firebase.initializeApp(
-        name: 'ca-provisioning-${DateTime.now().millisecondsSinceEpoch}',
-        options: Firebase.app().options,
-      );
+      FirebaseApp? secondaryApp;
+      try {
+        secondaryApp = await Firebase.initializeApp(
+          name: 'ca-provisioning-${DateTime.now().millisecondsSinceEpoch}',
+          options: Firebase.app().options,
+        );
 
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-      final secondaryStore = FirebaseFirestore.instanceFor(app: secondaryApp);
-      
-      final userCredential = await secondaryAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+        final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+        final secondaryStore = FirebaseFirestore.instanceFor(app: secondaryApp);
 
-      // Create user document with role 'ca' and link to CA
-      await secondaryStore.collection('users').doc(userCredential.user!.uid).set({
-        'email': email,
-        'role': 'ca',
-        'caId': docRef.id,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        final userCredential = await secondaryAuth
+            .createUserWithEmailAndPassword(email: email, password: password);
 
-      // Clean up secondary app
-      await secondaryAuth.signOut();
-      await secondaryApp.delete();
-      
+        // Create user document with role 'ca' and link to CA
+        await secondaryStore
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+              'email': email,
+              'role': 'ca',
+              'caId': docRef.id,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Clean up secondary app
+        await secondaryAuth.signOut();
+      } catch (e) {
+        print('Error creating CA user: $e');
+        // Continue without creating user if it fails
+      } finally {
+        // Always clean up secondary app
+        if (secondaryApp != null) {
+          try {
+            await secondaryApp.delete();
+          } catch (e) {
+            print('Error deleting secondary app: $e');
+          }
+        }
+      }
+
       // Add to local list with the generated ID
       final createdCA = CA(
         id: docRef.id,
@@ -178,7 +193,7 @@ class CAProvider extends ChangeNotifier {
         createdAt: now,
         updatedAt: now,
       );
-      
+
       _cas.add(createdCA);
 
       _isLoading = false;
@@ -200,8 +215,11 @@ class CAProvider extends ChangeNotifier {
       notifyListeners();
 
       final updatedCA = ca.copyWith(updatedAt: DateTime.now());
-      
-      await _firestore.collection('cas').doc(ca.id).update(updatedCA.toFirestore());
+
+      await _firestore
+          .collection('cas')
+          .doc(ca.id)
+          .update(updatedCA.toFirestore());
 
       // Update local list
       final index = _cas.indexWhere((c) => c.id == ca.id);
@@ -227,14 +245,68 @@ class CAProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Check if Firebase is properly initialized
+      if (!Firebase.apps.isNotEmpty) {
+        _error = 'Firebase not initialized';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Get the CA data before deleting
+      final ca = getCAById(id);
+      if (ca == null) {
+        _error = 'CA not found';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      print('Deleting CA: ${ca.email} (ID: $id)');
+
+      // 1. Delete from cas collection
       await _firestore.collection('cas').doc(id).delete();
-      
+      print('Deleted from cas collection');
+
+      // 2. Remove from all companies' caEmails field
+      for (final companyId in ca.companyIds) {
+        try {
+          await _firestore.collection('companies').doc(companyId).update({
+            'caEmails': FieldValue.arrayRemove([ca.email]),
+          });
+          print('Removed ${ca.email} from company $companyId');
+        } catch (e) {
+          print('Error removing CA from company $companyId: $e');
+          // Continue with other companies even if one fails
+        }
+      }
+
+      // 3. Delete from users collection (find by email and role 'ca')
+      try {
+        final usersSnapshot = await _firestore
+            .collection('users')
+            .where('email', isEqualTo: ca.email)
+            .where('role', isEqualTo: 'ca')
+            .get();
+
+        for (final userDoc in usersSnapshot.docs) {
+          await _firestore.collection('users').doc(userDoc.id).delete();
+          print('Deleted user ${userDoc.id} for CA ${ca.email}');
+        }
+      } catch (e) {
+        print('Error deleting user for CA ${ca.email}: $e');
+        // Continue even if user deletion fails
+      }
+
+      // 4. Remove from local list
       _cas.removeWhere((c) => c.id == id);
 
       _isLoading = false;
       notifyListeners();
+      print('CA deletion completed successfully');
       return true;
     } catch (e) {
+      print('Error in deleteCA: $e');
       _error = 'Failed to delete CA: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
@@ -319,7 +391,7 @@ class CAProvider extends ChangeNotifier {
       final updatedCompanyIds = ca.companyIds
           .where((id) => id != companyId)
           .toList();
-      
+
       await _firestore.collection('cas').doc(caId).update({
         'companyIds': updatedCompanyIds,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -348,10 +420,36 @@ class CAProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Check Firebase connectivity
+  Future<bool> checkFirebaseConnectivity() async {
+    try {
+      if (!Firebase.apps.isNotEmpty) {
+        _error = 'Firebase not initialized';
+        notifyListeners();
+        return false;
+      }
+
+      // Try a simple read operation to test connectivity
+      await _firestore.collection('cas').limit(1).get();
+      return true;
+    } catch (e) {
+      _error = 'Firebase connectivity issue: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Comprehensive data consistency fix for all CAs
   Future<bool> fixAllDataConsistency() async {
     try {
       print('Starting comprehensive data consistency fix...');
+
+      // Check if Firebase is properly initialized
+      if (!Firebase.apps.isNotEmpty) {
+        _error = 'Firebase not initialized';
+        notifyListeners();
+        return false;
+      }
 
       // 1. Get all CAs
       final casSnapshot = await _firestore.collection('cas').get();
@@ -470,6 +568,13 @@ class CAProvider extends ChangeNotifier {
   Future<bool> fixCASpecificConsistency(String caId) async {
     try {
       print('Starting specific CA consistency fix for: $caId');
+
+      // Check if Firebase is properly initialized
+      if (!Firebase.apps.isNotEmpty) {
+        _error = 'Firebase not initialized';
+        notifyListeners();
+        return false;
+      }
 
       // Get CA document
       final caDoc = await _firestore.collection('cas').doc(caId).get();
