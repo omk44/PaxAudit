@@ -133,41 +133,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
 
-      body: ListView(
-        children: [
-          ListTile(
-            title: const Text('CA Management'),
-            onTap: () => Navigator.pushNamed(context, '/ca_management'),
-          ),
-          ListTile(
-            title: const Text('Category Management'),
-            onTap: () => Navigator.pushNamed(context, '/category_management'),
-          ),
-          ListTile(
-            title: const Text('Income/Expense Viewer'),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
-            ),
-          ),
-          ListTile(
-            title: const Text('Income Management'),
-            onTap: () => Navigator.pushNamed(context, '/income_management'),
-          ),
-          ListTile(
-            title: const Text('Expense Management'),
-            onTap: () => Navigator.pushNamed(context, '/expense_management'),
-          ),
-          ListTile(
-            title: const Text('Tax Summary'),
-            onTap: () => Navigator.pushNamed(context, '/tax_summary'),
-          ),
-          ListTile(
-            title: const Text('Bank Statements'),
-            onTap: () => Navigator.pushNamed(context, '/bank_statements'),
-          ),
-        ],
-
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -184,9 +149,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ListTile(
                 leading: const Icon(Icons.person, color: Colors.purple),
                 title: const Text('Admin Profile'),
-                subtitle: const Text(
-                  'Edit company details and profile information',
-                ),
                 subtitle: const Text('Edit company details and profile information'),
                 onTap: () => Navigator.pushNamed(context, '/admin_profile'),
               ),
@@ -287,10 +249,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   }
                 },
               ),
-            ],
-          );
-        },
-
             ],
           );
         },

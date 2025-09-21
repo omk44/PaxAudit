@@ -80,36 +80,6 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
       body: Column(
         children: [
           Expanded(
-
-            child: ListView.builder(
-              itemCount: caProvider.cas.length,
-              itemBuilder: (context, index) {
-                final ca = caProvider.cas[index];
-                return ListTile(
-                  title: Text(ca.username),
-                  subtitle: Text('ID: ${ca.id}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => CAEditDialog(ca: ca),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () {
-                          caProvider.deleteCA(ca.id);
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
             child: RefreshIndicator(
               onRefresh: _refresh,
               child: ListView.builder(
@@ -146,7 +116,6 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                           },
                         ),
                         IconButton(
-
                           icon: const Icon(Icons.edit),
                           onPressed: () {
                             showDialog(
@@ -166,7 +135,6 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                   );
                 },
               ),
-
             ),
           ),
           Padding(

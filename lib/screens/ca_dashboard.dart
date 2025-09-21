@@ -131,37 +131,6 @@ class _CADashboardState extends State<CADashboard> {
         ],
       ),
 
-      body: ListView(
-        children: [
-          ListTile(
-            title: const Text('CA Details'),
-            onTap: () => Navigator.pushNamed(context, '/ca_details'),
-          ),
-          ListTile(
-            title: const Text('Income/Expense Viewer'),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IncomeExpenseManagerScreen()),
-            ),
-          ),
-          ListTile(
-            title: const Text('Income Management'),
-            onTap: () => Navigator.pushNamed(context, '/income_management'),
-          ),
-          ListTile(
-            title: const Text('Expense Management'),
-            onTap: () => Navigator.pushNamed(context, '/expense_management'),
-          ),
-          ListTile(
-            title: const Text('Tax Summary'),
-            onTap: () => Navigator.pushNamed(context, '/tax_summary'),
-          ),
-          ListTile(
-            title: const Text('Bank Statements'),
-            onTap: () => Navigator.pushNamed(context, '/bank_statements'),
-          ),
-        ],
-
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -256,10 +225,6 @@ class _CADashboardState extends State<CADashboard> {
                   }
                 },
               ),
-            ],
-          );
-        },
-
             ],
           );
         },

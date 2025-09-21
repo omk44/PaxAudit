@@ -21,8 +21,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
   String _licenseNumber = '';
   String _password = '';
   bool _isLoading = false;
-  
-
 
   @override
   Widget build(BuildContext context) {
@@ -30,22 +28,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
       title: const Text('Add CA'),
       content: Form(
         key: _formKey,
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Username'),
-              onChanged: (val) => _username = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter username' : null,
-            ),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-              onChanged: (val) => _password = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
-            ),
-          ],
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -61,9 +43,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
                   if (val == null || val.isEmpty) {
                     return 'Please enter email address';
                   }
-                  if (!RegExp(
-                    r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                  ).hasMatch(val)) {
                   if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
                     return 'Please enter a valid email address';
                   }
@@ -80,7 +59,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
                 validator: (val) => val == null || val.isEmpty
                     ? 'Please enter full name'
                     : null,
-
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -117,7 +95,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
               ),
             ],
           ),
-
         ),
       ),
       actions: [
@@ -138,7 +115,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
       ],
     );
   }
-
 
   Future<void> _handleAdd() async {
     if (!_formKey.currentState!.validate()) return;
@@ -163,7 +139,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
               'No company selected. Please select a company first.',
             ),
           ),
-
         );
         setState(() => _isLoading = false);
         return;
@@ -204,7 +179,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
           const SnackBar(
             content: Text('CA added and linked to company successfully'),
           ),
-
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -213,15 +187,13 @@ class _CAAddDialogState extends State<CAAddDialog> {
       }
     } catch (e) {
       print('Error in _handleAdd: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
   }
-
 }
 
 // --- Edit CA Dialog ---
@@ -235,17 +207,11 @@ class CAEditDialog extends StatefulWidget {
 
 class _CAEditDialogState extends State<CAEditDialog> {
   final _formKey = GlobalKey<FormState>();
-
-  late String _username;
-  late String _password;
-
   late String _email;
   late String _name;
   late String _phoneNumber;
   late String _licenseNumber;
   bool _isLoading = false;
-
-  
 
   @override
   void initState() {
@@ -262,25 +228,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
       title: const Text('Edit CA'),
       content: Form(
         key: _formKey,
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              initialValue: _username,
-              decoration: const InputDecoration(labelText: 'Username'),
-              onChanged: (val) => _username = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter username' : null,
-            ),
-            TextFormField(
-              initialValue: _password,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-              onChanged: (val) => _password = val,
-              validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
-            ),
-          ],
-
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -288,13 +235,11 @@ class _CAEditDialogState extends State<CAEditDialog> {
               TextFormField(
                 initialValue: _email,
                 enabled: false,
-
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 keyboardType: TextInputType.emailAddress,
-
                 onChanged: (val) => _email = val.trim(),
                 validator: (val) {
                   if (val == null || val.isEmpty) {
@@ -305,7 +250,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
                   }
                   return null;
                 },
-
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -318,7 +262,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
                 validator: (val) => val == null || val.isEmpty
                     ? 'Please enter full name'
                     : null,
-
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -341,7 +284,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
               ),
             ],
           ),
-
         ),
       ),
       actions: [
@@ -362,9 +304,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
       ],
     );
   }
-
-}
-
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
@@ -393,9 +332,6 @@ class _CAEditDialogState extends State<CAEditDialog> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}')),
       );
@@ -403,5 +339,4 @@ class _CAEditDialogState extends State<CAEditDialog> {
       setState(() => _isLoading = false);
     }
   }
-}
 }
