@@ -75,17 +75,20 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
   Future<void> _adminFinalReview(BankStatement bankStatement) async {
     await showDialog(
       context: context,
-      builder: (_) => BankStatementAdminFinalReviewDialog(bankStatement: bankStatement),
+      builder: (_) =>
+          BankStatementAdminFinalReviewDialog(bankStatement: bankStatement),
     );
   }
 
   Future<void> _openPdf(String url) async {
     try {
+      print('Attempting to open URL: $url');
+
       if (url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Invalid URL'),
+              content: Text('No URL provided'),
               backgroundColor: Colors.red,
             ),
           );
@@ -93,7 +96,31 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
         return;
       }
 
-      final uri = Uri.tryParse(url);
+      // Clean and validate the URL
+      String cleanUrl = url.trim();
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://$cleanUrl';
+      }
+
+      // Handle Google Drive URLs specifically
+      if (cleanUrl.contains('drive.google.com') &&
+          !cleanUrl.contains('/view')) {
+        // Convert Google Drive sharing URLs to direct view URLs
+        if (cleanUrl.contains('/file/d/')) {
+          final fileIdMatch = RegExp(
+            r'/file/d/([a-zA-Z0-9-_]+)',
+          ).firstMatch(cleanUrl);
+          if (fileIdMatch != null) {
+            final fileId = fileIdMatch.group(1);
+            cleanUrl = 'https://drive.google.com/file/d/$fileId/view';
+            print('Converted Google Drive URL to: $cleanUrl');
+          }
+        }
+      }
+
+      print('Cleaned URL: $cleanUrl');
+
+      final uri = Uri.tryParse(cleanUrl);
       if (uri == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -106,19 +133,60 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
         return;
       }
 
+      // Check if the URL can be launched
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // Try different launch modes
+        bool launched = false;
+
+        // First try with external application
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          print('Failed to launch with external application: $e');
+        }
+
+        // If external application failed, try with platformDefault
+        if (!launched) {
+          try {
+            launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+          } catch (e) {
+            print('Failed to launch with platform default: $e');
+          }
+        }
+
+        // If still failed, try with inAppWebView
+        if (!launched) {
+          try {
+            launched = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+          } catch (e) {
+            print('Failed to launch with inAppWebView: $e');
+          }
+        }
+
+        if (!launched) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Could not open link. Please check if you have a browser installed.',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Could not open link'),
+              content: Text('No app available to open this link'),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
+      print('Error in _openPdf: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -139,8 +207,8 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
     // Load data if not already loaded - prevent infinite loop
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final companyId = auth.companyId ?? auth.selectedCompany?.id;
-      if (companyId != null && 
-          bankStatementProvider.bankStatements.isEmpty && 
+      if (companyId != null &&
+          bankStatementProvider.bankStatements.isEmpty &&
           !bankStatementProvider.isLoading &&
           bankStatementProvider.error == null) {
         await bankStatementProvider.loadBankStatementsForCompany(companyId);
@@ -157,6 +225,12 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
           ],
         ),
         actions: [
+          // Test URL launcher button (temporary for debugging)
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () => _openPdf('https://www.google.com'),
+            tooltip: 'Test URL Launcher',
+          ),
           if (auth.role == 'admin') ...[
             IconButton(
               icon: const Icon(Icons.add_link),
@@ -200,19 +274,28 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
-                      final companyId = auth.companyId ?? auth.selectedCompany?.id;
+                      final auth = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      final companyId =
+                          auth.companyId ?? auth.selectedCompany?.id;
                       if (companyId != null) {
-                        Provider.of<BankStatementProvider>(context, listen: false)
-                            .loadBankStatementsForCompany(companyId);
+                        Provider.of<BankStatementProvider>(
+                          context,
+                          listen: false,
+                        ).loadBankStatementsForCompany(companyId);
                       }
                     },
-                    child: const Text('Retry', style: TextStyle(color: Colors.red)),
+                    child: const Text(
+                      'Retry',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               ),
             ),
-          
+
           // Main content
           Expanded(
             child: hasData
@@ -256,7 +339,8 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                       width: 50,
                                       height: 50,
                                       decoration: BoxDecoration(
-                                        color: bankStatement.status.color.withOpacity(0.1),
+                                        color: bankStatement.status.color
+                                            .withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: bankStatement.status.color,
@@ -273,7 +357,8 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             bankStatement.title,
@@ -300,27 +385,37 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                
+
                                 // Date range and status
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 4,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.blue.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
                                         '${_formatShortDate(bankStatement.statementStartDate)} - ${_formatShortDate(bankStatement.statementEndDate)}',
-                                        style: const TextStyle(fontSize: 12, color: Colors.blue),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blue,
+                                        ),
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: bankStatement.status.color.withOpacity(0.1),
+                                        color: bankStatement.status.color
+                                            .withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Row(
@@ -346,13 +441,16 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                
+
                                 // Created info
                                 Text(
                                   'Created: ${_formatDate(bankStatement.createdAt)} by ${bankStatement.uploadedBy}',
-                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                                
+
                                 // Comments if any
                                 if (bankStatement.caComments != null) ...[
                                   const SizedBox(height: 8),
@@ -364,7 +462,8 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const Text(
                                           'CA Comments:',
@@ -396,7 +495,8 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const Text(
                                           'Admin Comments:',
@@ -418,64 +518,106 @@ class _BankStatementsScreenState extends State<BankStatementsScreen> {
                                     ),
                                   ),
                                 ],
-                                
+
                                 const SizedBox(height: 12),
-                                
+
                                 // Action buttons
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.visibility, size: 20),
-                                      onPressed: () => _openPdf(bankStatement.linkUrl),
+                                      icon: const Icon(
+                                        Icons.visibility,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        print(
+                                          'Bank statement linkUrl: ${bankStatement.linkUrl}',
+                                        );
+                                        _openPdf(bankStatement.linkUrl);
+                                      },
                                       tooltip: 'Open Link',
                                       color: Colors.blue,
-                                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 40,
+                                        minHeight: 40,
+                                      ),
                                     ),
                                     if (auth.role == 'admin')
                                       IconButton(
                                         icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () => _addOrEditLink(existing: bankStatement),
+                                        onPressed: () => _addOrEditLink(
+                                          existing: bankStatement,
+                                        ),
                                         tooltip: 'Edit Link',
                                         color: Colors.green,
-                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
                                       ),
                                     if (auth.role == 'ca')
                                       IconButton(
-                                        icon: const Icon(Icons.rate_review, size: 20),
-                                        onPressed: () => _caReview(bankStatement),
+                                        icon: const Icon(
+                                          Icons.rate_review,
+                                          size: 20,
+                                        ),
+                                        onPressed: () =>
+                                            _caReview(bankStatement),
                                         tooltip: 'CA Review',
                                         color: Colors.orange,
-                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
                                       ),
                                     IconButton(
                                       icon: const Icon(Icons.history, size: 20),
                                       onPressed: () => showDialog(
                                         context: context,
-                                        builder: (_) => BankStatementHistoryDialog(
-                                          bankStatement: bankStatement,
-                                        ),
+                                        builder: (_) =>
+                                            BankStatementHistoryDialog(
+                                              bankStatement: bankStatement,
+                                            ),
                                       ),
                                       tooltip: 'View History',
                                       color: Colors.grey,
-                                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 40,
+                                        minHeight: 40,
+                                      ),
                                     ),
                                     if (auth.role == 'admin')
                                       IconButton(
-                                        icon: const Icon(Icons.admin_panel_settings, size: 20),
-                                        onPressed: () => _adminFinalReview(bankStatement),
+                                        icon: const Icon(
+                                          Icons.admin_panel_settings,
+                                          size: 20,
+                                        ),
+                                        onPressed: () =>
+                                            _adminFinalReview(bankStatement),
                                         tooltip: 'Admin Review',
                                         color: Colors.purple,
-                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
                                       ),
                                     if (auth.role == 'admin')
                                       IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () => _deleteBankStatement(bankStatement.id),
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          size: 20,
+                                        ),
+                                        onPressed: () => _deleteBankStatement(
+                                          bankStatement.id,
+                                        ),
                                         tooltip: 'Delete',
                                         color: Colors.red,
-                                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
                                       ),
                                   ],
                                 ),
