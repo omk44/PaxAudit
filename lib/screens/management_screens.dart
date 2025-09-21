@@ -15,8 +15,39 @@ import '../widgets/dialogs/income_dialogs.dart';
 import '../widgets/dialogs/expense_dialogs.dart';
 
 // --- CA Management Screen (Admin only) ---
-class CAManagementScreen extends StatelessWidget {
+class CAManagementScreen extends StatefulWidget {
   const CAManagementScreen({super.key});
+
+  @override
+  State<CAManagementScreen> createState() => _CAManagementScreenState();
+}
+
+class _CAManagementScreenState extends State<CAManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // ignore: discarded_futures
+        _refresh();
+      });
+    }
+  }
+
+  Future<void> _refresh() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final caProvider = Provider.of<CAProvider>(context, listen: false);
+    final companyId = auth.selectedCompany?.id;
+    if (companyId != null) {
+      await caProvider.loadCAsForCompany(companyId);
+    } else {
+      // Fallback: show none if no company selected
+      await caProvider.loadCAsForCompany('__none__');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +80,7 @@ class CAManagementScreen extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-<<<<<<< Updated upstream
+
             child: ListView.builder(
               itemCount: caProvider.cas.length,
               itemBuilder: (context, index) {
@@ -79,7 +110,6 @@ class CAManagementScreen extends StatelessWidget {
                   ),
                 );
               },
-=======
             child: RefreshIndicator(
               onRefresh: _refresh,
               child: ListView.builder(
@@ -116,6 +146,7 @@ class CAManagementScreen extends StatelessWidget {
                           },
                         ),
                         IconButton(
+
                           icon: const Icon(Icons.edit),
                           onPressed: () {
                             showDialog(
@@ -135,7 +166,7 @@ class CAManagementScreen extends StatelessWidget {
                   );
                 },
               ),
->>>>>>> Stashed changes
+
             ),
           ),
           Padding(
@@ -143,11 +174,13 @@ class CAManagementScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.add),
               label: const Text('Add CA'),
-              onPressed: () {
-                showDialog(
+              onPressed: () async {
+                await showDialog(
                   context: context,
                   builder: (_) => const CAAddDialog(),
                 );
+                // Reload list after adding
+                if (mounted) _refresh();
               },
             ),
           ),
@@ -158,14 +191,77 @@ class CAManagementScreen extends StatelessWidget {
 }
 
 // --- Category Management Screen ---
-class CategoryManagementScreen extends StatelessWidget {
+class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
+
+  @override
+  State<CategoryManagementScreen> createState() =>
+      _CategoryManagementScreenState();
+}
+
+class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final ap = Provider.of<AuthProvider>(context, listen: false);
+        final cid = ap.companyId ?? ap.selectedCompany?.id;
+        if (cid != null && cid.isNotEmpty) {
+          await Provider.of<CategoryProvider>(
+            context,
+            listen: false,
+          ).loadCategoriesForCompany(cid);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final categoryProvider = Provider.of<CategoryProvider>(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Category Management')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.category_rounded),
+            SizedBox(width: 8),
+            Text('Category Management'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Seed Indian GST categories',
+            icon: const Icon(Icons.auto_awesome_rounded),
+            onPressed: () async {
+              final ap = Provider.of<AuthProvider>(context, listen: false);
+              final cid = ap.companyId ?? ap.selectedCompany?.id;
+              if (cid == null || cid.isEmpty) return;
+              await Provider.of<CategoryProvider>(
+                context,
+                listen: false,
+              ).seedDefaultIndianCategories(
+                companyId: cid,
+                editedBy: ap.role ?? 'admin',
+              );
+              if (mounted) {
+                await Provider.of<CategoryProvider>(
+                  context,
+                  listen: false,
+                ).loadCategoriesForCompany(cid);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Seeded default Indian GST categories'),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -174,14 +270,18 @@ class CategoryManagementScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final cat = categoryProvider.categories[index];
                 return ListTile(
+                  leading: const Icon(Icons.label_outline_rounded),
                   title: Text(cat.name),
-                  subtitle: Text('ID: ${cat.id}'),
+                  subtitle: Text(
+                    'GST: ${cat.gstPercentage.toStringAsFixed(2)}%  •  ID: ${cat.id}',
+                  ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      // Note: This would need a deleteCategory method in CategoryProvider
-                      // For now, we'll just remove from the list
-                      categoryProvider.categories.removeAt(index);
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: () async {
+                      await Provider.of<CategoryProvider>(
+                        context,
+                        listen: false,
+                      ).deleteCategory(cat.id);
                     },
                   ),
                 );
@@ -191,12 +291,15 @@ class CategoryManagementScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_circle_rounded),
               label: const Text('Add Category'),
               onPressed: () {
+                final ap = Provider.of<AuthProvider>(context, listen: false);
+                final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
                 showDialog(
                   context: context,
-                  builder: (_) => CategoryAddDialog(editedBy: 'admin'),
+                  builder: (_) =>
+                      CategoryAddDialog(editedBy: 'admin', companyId: cid),
                 );
               },
             ),
@@ -208,8 +311,34 @@ class CategoryManagementScreen extends StatelessWidget {
 }
 
 // --- Income Management Screen ---
-class IncomeManagementScreen extends StatelessWidget {
+class IncomeManagementScreen extends StatefulWidget {
   const IncomeManagementScreen({super.key});
+
+  @override
+  State<IncomeManagementScreen> createState() => _IncomeManagementScreenState();
+}
+
+class _IncomeManagementScreenState extends State<IncomeManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final companyId = auth.companyId ?? auth.selectedCompany?.id;
+        if (companyId != null) {
+          // Load data for the company (provider will handle clearing if needed)
+          await Provider.of<IncomeProvider>(
+            context,
+            listen: false,
+          ).loadIncomesForCompany(companyId);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,12 +348,25 @@ class IncomeManagementScreen extends StatelessWidget {
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Income Management')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => IncomeAddDialog(addedBy: auth.role ?? 'admin'),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.trending_up_rounded),
+            SizedBox(width: 8),
+            Text('Income Management'),
+          ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          final ap = Provider.of<AuthProvider>(context, listen: false);
+          final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+          showDialog(
+            context: context,
+            builder: (_) =>
+                IncomeAddDialog(addedBy: auth.role ?? 'admin', companyId: cid),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Income'),
       ),
@@ -232,47 +374,64 @@ class IncomeManagementScreen extends StatelessWidget {
           ? Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: incomeProvider.incomes.length,
-                    itemBuilder: (context, index) {
-                      final inc = incomeProvider.incomes[index];
-                      return ListTile(
-                        title: Text(
-                          'Amount: ₹${inc.amount.toStringAsFixed(2)}',
-                        ),
-                        subtitle: Text(
-                          'Date: ${dt.format(inc.date.toLocal())}',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.history),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) =>
-                                    IncomeHistoryDialog(income: inc),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) => IncomeEditDialog(
-                                  income: inc,
-                                  editedBy: auth.role ?? 'admin',
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      final auth = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      final companyId =
+                          auth.companyId ?? auth.selectedCompany?.id;
+                      if (companyId != null) {
+                        await Provider.of<IncomeProvider>(
+                          context,
+                          listen: false,
+                        ).loadIncomesForCompany(companyId);
+                      }
+                    },
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: incomeProvider.incomes.length,
+                      itemBuilder: (context, index) {
+                        final inc = incomeProvider.incomes[index];
+                        return ListTile(
+                          title: Text(
+                            'Amount: ₹${inc.amount.toStringAsFixed(2)}',
+                          ),
+                          subtitle: Text(
+                            'Date: ${dt.format(inc.date.toLocal())}\nAdded by: ${inc.addedBy}',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.history),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) =>
+                                      IncomeHistoryDialog(income: inc),
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () =>
-                                  incomeProvider.deleteIncome(inc.id),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => IncomeEditDialog(
+                                    income: inc,
+                                    editedBy: auth.role ?? 'admin',
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () =>
+                                    incomeProvider.deleteIncome(inc.id),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 72),
@@ -285,11 +444,20 @@ class IncomeManagementScreen extends StatelessWidget {
                   const Text('No incomes yet.'),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) =>
-                          IncomeAddDialog(addedBy: auth.role ?? 'admin'),
-                    ),
+                    onPressed: () {
+                      final ap = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+                      showDialog(
+                        context: context,
+                        builder: (_) => IncomeAddDialog(
+                          addedBy: auth.role ?? 'admin',
+                          companyId: cid,
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Income'),
                   ),
@@ -301,8 +469,39 @@ class IncomeManagementScreen extends StatelessWidget {
 }
 
 // --- Expense Management Screen ---
-class ExpenseManagementScreen extends StatelessWidget {
+class ExpenseManagementScreen extends StatefulWidget {
   const ExpenseManagementScreen({super.key});
+
+  @override
+  State<ExpenseManagementScreen> createState() =>
+      _ExpenseManagementScreenState();
+}
+
+class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final companyId = auth.companyId ?? auth.selectedCompany?.id;
+        if (companyId != null) {
+          // Load data for the company (provider will handle clearing if needed)
+          await Provider.of<ExpenseProvider>(
+            context,
+            listen: false,
+          ).loadExpensesForCompany(companyId);
+          await Provider.of<CategoryProvider>(
+            context,
+            listen: false,
+          ).loadCategoriesForCompany(companyId);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -313,12 +512,25 @@ class ExpenseManagementScreen extends StatelessWidget {
     final dt = DateFormat('yyyy-MM-dd HH:mm');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Expense Management')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => ExpenseAddDialog(addedBy: auth.role ?? 'admin'),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.trending_down_rounded),
+            SizedBox(width: 8),
+            Text('Expense Management'),
+          ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          final ap = Provider.of<AuthProvider>(context, listen: false);
+          final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+          showDialog(
+            context: context,
+            builder: (_) =>
+                ExpenseAddDialog(addedBy: auth.role ?? 'admin', companyId: cid),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Expense'),
       ),
@@ -326,61 +538,84 @@ class ExpenseManagementScreen extends StatelessWidget {
           ? Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: expenseProvider.expenses.length,
-                    itemBuilder: (context, index) {
-                      final exp = expenseProvider.expenses[index];
-                      final catName = categoryProvider.categories
-                          .firstWhere(
-                            (c) => c.id == exp.categoryId,
-                            orElse: () => Category(
-                              id: '',
-                              name: 'Deleted',
-                              lastEditedBy: '',
-                              lastEditedAt: DateTime.now(),
-                              history: [],
-                            ),
-                          )
-                          .name;
-                      return ListTile(
-                        title: Text(
-                          'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.totalGst.toStringAsFixed(2)}',
-                        ),
-                        subtitle: Text(
-                          'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.bankAccount}\nDate: ${dt.format(exp.date.toLocal())}',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.history),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) => ExpenseHistoryDialog(
-                                  expense: exp,
-                                  categoryProvider: categoryProvider,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (_) => ExpenseEditDialog(
-                                  expense: exp,
-                                  editedBy: auth.role ?? 'admin',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () =>
-                                  expenseProvider.deleteExpense(exp.id),
-                            ),
-                          ],
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      final auth = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
                       );
+                      final companyId =
+                          auth.companyId ?? auth.selectedCompany?.id;
+                      if (companyId != null) {
+                        await Provider.of<ExpenseProvider>(
+                          context,
+                          listen: false,
+                        ).loadExpensesForCompany(companyId);
+                        await Provider.of<CategoryProvider>(
+                          context,
+                          listen: false,
+                        ).loadCategoriesForCompany(companyId);
+                      }
                     },
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: expenseProvider.expenses.length,
+                      itemBuilder: (context, index) {
+                        final exp = expenseProvider.expenses[index];
+                        final catName = categoryProvider.categories
+                            .firstWhere(
+                              (c) => c.id == exp.categoryId,
+                              orElse: () => Category(
+                                id: '',
+                                name: 'Unknown',
+                                gstPercentage: 0.0,
+                                lastEditedBy: '',
+                                lastEditedAt: DateTime.now(),
+                                history: [],
+                                companyId: '',
+                              ),
+                            )
+                            .name;
+                        return ListTile(
+                          title: Text(
+                            'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
+                          ),
+                          subtitle: Text(
+                            'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${dt.format(exp.date.toLocal())}\nAdded by: ${exp.addedBy}',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.history),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => ExpenseHistoryDialog(
+                                    expense: exp,
+                                    categoryProvider: categoryProvider,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => ExpenseEditDialog(
+                                    expense: exp,
+                                    editedBy: auth.role ?? 'admin',
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () =>
+                                    expenseProvider.deleteExpense(exp.id),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 72),
@@ -393,11 +628,20 @@ class ExpenseManagementScreen extends StatelessWidget {
                   const Text('No expenses yet.'),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) =>
-                          ExpenseAddDialog(addedBy: auth.role ?? 'admin'),
-                    ),
+                    onPressed: () {
+                      final ap = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      final cid = ap.companyId ?? ap.selectedCompany?.id ?? '';
+                      showDialog(
+                        context: context,
+                        builder: (_) => ExpenseAddDialog(
+                          addedBy: auth.role ?? 'admin',
+                          companyId: cid,
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Expense'),
                   ),
@@ -467,16 +711,26 @@ class _IncomeExpenseManagerScreenState
 
     final bankAccounts = <String>{
       'All',
-      ...allExpenses.map((e) => e.bankAccount),
+      ...allExpenses.map((e) => e.paymentMethod.name),
     }.toList()..sort();
 
     final incomes = allIncomes; // no bank filter for incomes
     final expenses = allExpenses
-        .where((e) => _bankFilter == 'All' || e.bankAccount == _bankFilter)
+        .where(
+          (e) => _bankFilter == 'All' || e.paymentMethod.name == _bankFilter,
+        )
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Income/Expense Viewer')),
+      appBar: AppBar(
+        title: Row(
+          children: const [
+            Icon(Icons.attach_money_rounded),
+            SizedBox(width: 8),
+            Text('Income/Expense Viewer'),
+          ],
+        ),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -591,7 +845,9 @@ class _IncomeExpenseManagerScreenState
                 ...incomes.map(
                   (inc) => ListTile(
                     title: Text('Amount: ₹${inc.amount.toStringAsFixed(2)}'),
-                    subtitle: Text('Date: ${_formatDate(inc.date)}'),
+                    subtitle: Text(
+                      'Date: ${_formatDate(inc.date)}\nAdded by: ${inc.addedBy}',
+                    ),
                     onTap: () => showDialog(
                       context: context,
                       builder: (_) => IncomeHistoryDialog(income: inc),
@@ -612,18 +868,20 @@ class _IncomeExpenseManagerScreenState
                         orElse: () => Category(
                           id: '',
                           name: 'Deleted',
+                          gstPercentage: 0.0,
                           lastEditedBy: '',
                           lastEditedAt: DateTime.now(),
                           history: [],
+                          companyId: '',
                         ),
                       )
                       .name;
                   return ListTile(
                     title: Text(
-                      'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.totalGst.toStringAsFixed(2)}',
+                      'Amount: ₹${exp.amount.toStringAsFixed(2)} | GST: ₹${exp.gstAmount.toStringAsFixed(2)}',
                     ),
                     subtitle: Text(
-                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.bankAccount}\nDate: ${_formatDate(exp.date)}',
+                      'Category: $catName\nInvoice: ${exp.invoiceNumber}\nBank: ${exp.paymentMethod.name}\nDate: ${_formatDate(exp.date)}\nAdded by: ${exp.addedBy}',
                     ),
                     onTap: () => showDialog(
                       context: context,

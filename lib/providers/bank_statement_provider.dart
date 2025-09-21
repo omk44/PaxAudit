@@ -20,6 +20,7 @@ class BankStatementProvider extends ChangeNotifier {
     final switchingCompany =
         _currentCompanyId != null && _currentCompanyId != companyId;
 
+
     // Don't reload if already loading for the same company
     if (_currentCompanyId == companyId && _isLoading) {
       print(
@@ -445,6 +446,7 @@ class BankStatementProvider extends ChangeNotifier {
       print('Error sending notifications: $e');
     }
   }
+
 
   // Clear all bank statements (useful for logout)
   void clearBankStatements() {

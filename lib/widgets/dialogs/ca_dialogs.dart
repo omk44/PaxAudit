@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/ca_provider.dart';
+import '../../providers/company_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/ca.dart';
 
 // --- Add CA Dialog ---
@@ -13,21 +15,22 @@ class CAAddDialog extends StatefulWidget {
 
 class _CAAddDialogState extends State<CAAddDialog> {
   final _formKey = GlobalKey<FormState>();
-  String _username = '';
+  String _email = '';
+  String _name = '';
+  String _phoneNumber = '';
+  String _licenseNumber = '';
   String _password = '';
-<<<<<<< Updated upstream
-  
-=======
   bool _isLoading = false;
+  
 
->>>>>>> Stashed changes
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Add CA'),
       content: Form(
         key: _formKey,
-<<<<<<< Updated upstream
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -43,7 +46,6 @@ class _CAAddDialogState extends State<CAAddDialog> {
               validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
             ),
           ],
-=======
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -62,6 +64,7 @@ class _CAAddDialogState extends State<CAAddDialog> {
                   if (!RegExp(
                     r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
                   ).hasMatch(val)) {
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
                     return 'Please enter a valid email address';
                   }
                   return null;
@@ -77,6 +80,7 @@ class _CAAddDialogState extends State<CAAddDialog> {
                 validator: (val) => val == null || val.isEmpty
                     ? 'Please enter full name'
                     : null,
+
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -113,28 +117,28 @@ class _CAAddDialogState extends State<CAAddDialog> {
               ),
             ],
           ),
->>>>>>> Stashed changes
+
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Provider.of<CAProvider>(context, listen: false).addCA(_username, _password);
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('Add'),
+          onPressed: _isLoading ? null : _handleAdd,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Add CA'),
         ),
       ],
     );
   }
-<<<<<<< Updated upstream
-=======
+
 
   Future<void> _handleAdd() async {
     if (!_formKey.currentState!.validate()) return;
@@ -147,6 +151,7 @@ class _CAAddDialogState extends State<CAAddDialog> {
         context,
         listen: false,
       );
+
       final auth = Provider.of<AuthProvider>(context, listen: false);
 
       // Get the selected company ID for linking
@@ -158,6 +163,7 @@ class _CAAddDialogState extends State<CAAddDialog> {
               'No company selected. Please select a company first.',
             ),
           ),
+
         );
         setState(() => _isLoading = false);
         return;
@@ -198,6 +204,7 @@ class _CAAddDialogState extends State<CAAddDialog> {
           const SnackBar(
             content: Text('CA added and linked to company successfully'),
           ),
+
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -209,11 +216,12 @@ class _CAAddDialogState extends State<CAAddDialog> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+
     } finally {
       setState(() => _isLoading = false);
     }
   }
->>>>>>> Stashed changes
+
 }
 
 // --- Edit CA Dialog ---
@@ -227,23 +235,25 @@ class CAEditDialog extends StatefulWidget {
 
 class _CAEditDialogState extends State<CAEditDialog> {
   final _formKey = GlobalKey<FormState>();
-<<<<<<< Updated upstream
+
   late String _username;
   late String _password;
-  
-=======
+
   late String _email;
   late String _name;
   late String _phoneNumber;
   late String _licenseNumber;
   bool _isLoading = false;
 
->>>>>>> Stashed changes
+  
+
   @override
   void initState() {
     super.initState();
-    _username = widget.ca.username;
-    _password = widget.ca.password;
+    _email = widget.ca.email;
+    _name = widget.ca.name;
+    _phoneNumber = widget.ca.phoneNumber ?? '';
+    _licenseNumber = widget.ca.licenseNumber ?? '';
   }
 
   @override
@@ -252,7 +262,7 @@ class _CAEditDialogState extends State<CAEditDialog> {
       title: const Text('Edit CA'),
       content: Form(
         key: _formKey,
-<<<<<<< Updated upstream
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -270,7 +280,7 @@ class _CAEditDialogState extends State<CAEditDialog> {
               validator: (val) => val == null || val.isEmpty ? 'Enter password' : null,
             ),
           ],
-=======
+
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -278,11 +288,24 @@ class _CAEditDialogState extends State<CAEditDialog> {
               TextFormField(
                 initialValue: _email,
                 enabled: false,
+
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 keyboardType: TextInputType.emailAddress,
+
+                onChanged: (val) => _email = val.trim(),
+                validator: (val) {
+                  if (val == null || val.isEmpty) {
+                    return 'Please enter email address';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
+                    return 'Please enter a valid email address';
+                  }
+                  return null;
+                },
+
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -295,6 +318,7 @@ class _CAEditDialogState extends State<CAEditDialog> {
                 validator: (val) => val == null || val.isEmpty
                     ? 'Please enter full name'
                     : null,
+
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -317,30 +341,30 @@ class _CAEditDialogState extends State<CAEditDialog> {
               ),
             ],
           ),
->>>>>>> Stashed changes
+
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Provider.of<CAProvider>(context, listen: false)
-                  .editCA(widget.ca.id, _username, _password);
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('Save'),
+          onPressed: _isLoading ? null : _handleSave,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save Changes'),
         ),
       ],
     );
   }
-<<<<<<< Updated upstream
+
 }
-=======
+
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
@@ -350,6 +374,7 @@ class _CAEditDialogState extends State<CAEditDialog> {
     try {
       final caProvider = Provider.of<CAProvider>(context, listen: false);
       final updatedCA = widget.ca.copyWith(
+        email: _email,
         name: _name,
         phoneNumber: _phoneNumber.isEmpty ? null : _phoneNumber,
         licenseNumber: _licenseNumber.isEmpty ? null : _licenseNumber,
@@ -371,9 +396,12 @@ class _CAEditDialogState extends State<CAEditDialog> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
   }
 }
->>>>>>> Stashed changes
+}

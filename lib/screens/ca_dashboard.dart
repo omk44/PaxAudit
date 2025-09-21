@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-<<<<<<< Updated upstream
-=======
+
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/bank_statement_provider.dart';
 import '../providers/notification_provider.dart';
->>>>>>> Stashed changes
+
 import 'management_screens.dart';
 import 'notification_screen.dart';
 
-class CADashboard extends StatelessWidget {
+class CADashboard extends StatefulWidget {
   const CADashboard({super.key});
 
   @override
-<<<<<<< Updated upstream
-=======
+
   State<CADashboard> createState() => _CADashboardState();
 }
 
@@ -80,12 +78,12 @@ class _CADashboardState extends State<CADashboard> {
         ).loadNotificationsForCA(caEmail);
       }
 
+
       _lastLoadedCompanyId = companyId;
     }
   }
 
-  @override
->>>>>>> Stashed changes
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -132,7 +130,7 @@ class _CADashboardState extends State<CADashboard> {
           ),
         ],
       ),
-<<<<<<< Updated upstream
+
       body: ListView(
         children: [
           ListTile(
@@ -163,7 +161,7 @@ class _CADashboardState extends State<CADashboard> {
             onTap: () => Navigator.pushNamed(context, '/bank_statements'),
           ),
         ],
-=======
+
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -261,7 +259,10 @@ class _CADashboardState extends State<CADashboard> {
             ],
           );
         },
->>>>>>> Stashed changes
+
+            ],
+          );
+        },
       ),
     );
   }

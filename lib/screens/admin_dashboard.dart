@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-<<<<<<< Updated upstream
-=======
+
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/ca_provider.dart';
 import '../providers/bank_statement_provider.dart';
 import '../providers/notification_provider.dart';
->>>>>>> Stashed changes
+
 import 'management_screens.dart';
 import 'notification_screen.dart';
 
-class AdminDashboard extends StatelessWidget {
+class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
   @override
-<<<<<<< Updated upstream
-=======
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
@@ -87,7 +84,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   @override
->>>>>>> Stashed changes
+
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -134,7 +132,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
-<<<<<<< Updated upstream
+
       body: ListView(
         children: [
           ListTile(
@@ -169,7 +167,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onTap: () => Navigator.pushNamed(context, '/bank_statements'),
           ),
         ],
-=======
+
       body: Consumer<AuthProvider>(
         builder: (context, auth, child) {
           if (auth.selectedCompany == null) {
@@ -189,6 +187,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 subtitle: const Text(
                   'Edit company details and profile information',
                 ),
+                subtitle: const Text('Edit company details and profile information'),
                 onTap: () => Navigator.pushNamed(context, '/admin_profile'),
               ),
               const Divider(),
@@ -291,7 +290,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           );
         },
->>>>>>> Stashed changes
+
+            ],
+          );
+        },
       ),
     );
   }

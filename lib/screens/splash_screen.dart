@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/data_persistence_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,13 +26,16 @@ class _SplashScreenState extends State<SplashScreen> {
       final auth = Provider.of<AuthProvider>(context, listen: false);
 
       if (auth.isLoggedIn) {
+        // Load data for the logged-in user
+        await DataPersistenceHelper.ensureDataLoaded(context);
+        
         if (auth.role == 'admin') {
           Navigator.pushReplacementNamed(context, '/admin_dashboard');
         } else {
           Navigator.pushReplacementNamed(context, '/ca_dashboard');
         }
       } else {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushReplacementNamed(context, '/home');
       }
     }
   }

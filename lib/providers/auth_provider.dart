@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import '../models/company.dart';
+import '../models/ca.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -8,12 +11,18 @@ class AuthProvider extends ChangeNotifier {
 
   User? _user;
   String? _role; // 'admin' or 'ca'
-  String? _caId; // If CA, store CA id
+  String? _companyId; // Selected company ID
+  Company? _selectedCompany; // Current company for admin/CA
+  CA? _caProfile; // CA profile if logged in as CA
+  List<Company> _availableCompanies = []; // Companies available to current user
 
   User? get user => _user;
   bool get isLoggedIn => _user != null;
   String? get role => _role;
-  String? get caId => _caId;
+  String? get companyId => _companyId;
+  Company? get selectedCompany => _selectedCompany;
+  CA? get caProfile => _caProfile;
+  List<Company> get availableCompanies => _availableCompanies;
 
   AuthProvider() {
     _auth.authStateChanges().listen((User? user) {
@@ -22,7 +31,10 @@ class AuthProvider extends ChangeNotifier {
         _loadUserRole();
       } else {
         _role = null;
-        _caId = null;
+        _companyId = null;
+        _selectedCompany = null;
+        _caProfile = null;
+        _availableCompanies = [];
       }
       notifyListeners();
     });
@@ -35,7 +47,17 @@ class AuthProvider extends ChangeNotifier {
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
           _role = data['role'] ?? 'admin';
-          _caId = data['caId'];
+          
+          if (_role == 'ca') {
+            // Load CA profile and available companies
+            await _loadCAProfile();
+          } else {
+            // Load admin's company
+            _companyId = data['companyId'];
+            if (_companyId != null) {
+              await _loadSelectedCompany(_companyId!);
+            }
+          }
         } else {
           // Create default admin user if doesn't exist
           await _firestore.collection('users').doc(_user!.uid).set({
@@ -51,6 +73,54 @@ class AuthProvider extends ChangeNotifier {
         _role = 'admin'; // Default to admin on error
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> _loadCAProfile() async {
+    if (_user?.email != null) {
+      try {
+        final snapshot = await _firestore
+            .collection('cas')
+            .where('email', isEqualTo: _user!.email)
+            .limit(1)
+            .get();
+        
+        if (snapshot.docs.isNotEmpty) {
+          _caProfile = CA.fromFirestore(snapshot.docs.first);
+          await _loadAvailableCompanies();
+        }
+      } catch (e) {
+        print('Error loading CA profile: $e');
+      }
+    }
+  }
+
+  Future<void> _loadAvailableCompanies() async {
+    if (_user?.email != null) {
+      try {
+        final snapshot = await _firestore
+            .collection('companies')
+            .where('caEmails', arrayContains: _user!.email)
+            .get();
+        
+        _availableCompanies = snapshot.docs
+            .map((doc) => Company.fromFirestore(doc))
+            .toList();
+      } catch (e) {
+        print('Error loading available companies: $e');
+        _availableCompanies = [];
+      }
+    }
+  }
+
+  Future<void> _loadSelectedCompany(String companyId) async {
+    try {
+      final doc = await _firestore.collection('companies').doc(companyId).get();
+      if (doc.exists) {
+        _selectedCompany = Company.fromFirestore(doc);
+      }
+    } catch (e) {
+      print('Error loading selected company: $e');
     }
   }
 
@@ -75,7 +145,16 @@ class AuthProvider extends ChangeNotifier {
           final data = doc.data() as Map<String, dynamic>;
           if (data['role'] == role) {
             _role = role;
-            _caId = data['caId'];
+            
+            if (_role == 'ca') {
+              await _loadCAProfile();
+            } else {
+              _companyId = data['companyId'];
+              if (_companyId != null) {
+                await _loadSelectedCompany(_companyId!);
+              }
+            }
+            
             notifyListeners();
             return true;
           } else {
@@ -83,7 +162,13 @@ class AuthProvider extends ChangeNotifier {
             return false;
           }
         } else {
-          // Create new user with specified role
+          // For new users, only allow admin role during signup
+          if (role != 'admin') {
+            await _auth.signOut();
+            return false;
+          }
+          
+          // Create new admin user
           await _firestore
               .collection('users')
               .doc(userCredential.user!.uid)
@@ -136,19 +221,150 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _auth.signOut();
       _role = null;
-      _caId = null;
+      _companyId = null;
+      _selectedCompany = null;
+      _caProfile = null;
+      _availableCompanies = [];
       notifyListeners();
     } catch (e) {
       print('Sign out error: $e');
     }
   }
 
-  // Legacy method for backward compatibility
-  void login(String role, {String? caId}) {
-    _role = role;
-    _caId = caId;
-    notifyListeners();
+  // Select company for CA or admin
+  Future<bool> selectCompany(String companyId) async {
+    try {
+      _companyId = companyId;
+      await _loadSelectedCompany(companyId);
+      
+      // Update user document with selected company
+      if (_user != null) {
+        await _firestore.collection('users').doc(_user!.uid).update({
+          'companyId': companyId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Error selecting company: $e');
+      return false;
+    }
   }
+
+  // Get companies for CA login
+  Future<List<Company>> getAvailableCompaniesForEmail(String email) async {
+    try {
+      final snapshot = await _firestore
+          .collection('companies')
+          .where('caEmails', arrayContains: email)
+          .get();
+      
+      return snapshot.docs.map((doc) => Company.fromFirestore(doc)).toList();
+    } catch (e) {
+      print('Error loading companies for email: $e');
+      return [];
+    }
+  }
+
+  // Create company during admin signup
+  Future<bool> createCompanyForAdmin(String companyName, String adminName) async {
+    if (_user == null) return false;
+    
+    try {
+      final now = DateTime.now();
+      final companyData = {
+        'name': companyName,
+        'adminEmail': _user!.email!,
+        'adminName': adminName,
+        'caEmails': <String>[],
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
+
+      final companyDoc = await _firestore.collection('companies').add(companyData);
+      
+      // Update user with company ID
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'companyId': companyDoc.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _companyId = companyDoc.id;
+      await _loadSelectedCompany(companyDoc.id);
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Error creating company: $e');
+      return false;
+    }
+  }
+
+  // Create company with all details during admin signup
+  Future<bool> createCompanyForAdminWithDetails(
+    String companyName,
+    String adminName,
+    String? description,
+    String? address,
+    String? city,
+    String? state,
+    String? pincode,
+    String? phoneNumber,
+    String? email,
+    String? website,
+    String? gstNumber,
+    String? panNumber,
+    String? contactPerson,
+    String? contactPhone,
+    String? contactEmail,
+  ) async {
+    if (_user == null) return false;
+    
+    try {
+      final now = DateTime.now();
+      final companyData = {
+        'name': companyName,
+        'adminEmail': _user!.email!,
+        'adminName': adminName,
+        'description': description,
+        'address': address,
+        'city': city,
+        'state': state,
+        'pincode': pincode,
+        'phoneNumber': phoneNumber,
+        'email': email,
+        'website': website,
+        'gstNumber': gstNumber,
+        'panNumber': panNumber,
+        'contactPerson': contactPerson,
+        'contactPhone': contactPhone,
+        'contactEmail': contactEmail,
+        'caEmails': <String>[],
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
+
+      final companyDoc = await _firestore.collection('companies').add(companyData);
+      
+      // Update user with company ID
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'companyId': companyDoc.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _companyId = companyDoc.id;
+      await _loadSelectedCompany(companyDoc.id);
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Error creating company with details: $e');
+      return false;
+    }
+  }
+
 
   void logout() {
     signOut();
