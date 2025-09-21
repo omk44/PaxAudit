@@ -9,6 +9,11 @@ import 'providers/ca_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/income_provider.dart';
+<<<<<<< Updated upstream
+=======
+import 'providers/bank_statement_provider.dart';
+import 'providers/notification_provider.dart';
+>>>>>>> Stashed changes
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -17,6 +22,11 @@ import 'screens/ca_dashboard.dart';
 import 'screens/management_screens.dart';
 import 'screens/ca_details_screen.dart';
 import 'screens/placeholder_screens.dart';
+<<<<<<< Updated upstream
+=======
+import 'screens/admin_profile_screen.dart';
+import 'screens/notification_screen.dart';
+>>>>>>> Stashed changes
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +55,11 @@ class PaxAuditApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => IncomeProvider()),
+<<<<<<< Updated upstream
+=======
+        ChangeNotifierProvider(create: (_) => BankStatementProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+>>>>>>> Stashed changes
       ],
       child: MaterialApp(
         title: 'PaxAudit',
@@ -68,6 +83,7 @@ class PaxAuditApp extends StatelessWidget {
           '/bank_statements': (context) => const BankStatementsScreen(),
           '/request_statement': (context) => const RequestStatementScreen(),
           '/comment_modal': (context) => const CommentModalScreen(),
+          '/notifications': (context) => const NotificationScreen(),
         },
       ),
     );
