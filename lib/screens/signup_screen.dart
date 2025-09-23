@@ -375,12 +375,12 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Company Address (Optional)
+          // Company Address (Required)
           _buildInputCard(
             child: TextFormField(
               decoration: const InputDecoration(
-                labelText: 'Company Address',
-                hintText: 'Enter company address (optional)',
+                labelText: 'Company Address *',
+                hintText: 'Enter company address',
                 prefixIcon: Icon(Icons.location_on_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -391,18 +391,24 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               maxLines: 2,
               onChanged: (val) => _companyAddress = val.trim(),
+              validator: (val) {
+                if (val == null || val.isEmpty) {
+                  return 'Please enter company address';
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 16),
 
-          // City, State, Pincode Row
+          // City, State, Pincode Row (Required)
           Row(
             children: [
               Expanded(
                 child: _buildInputCard(
                   child: TextFormField(
                     decoration: const InputDecoration(
-                      labelText: 'City',
+                      labelText: 'City *',
                       hintText: 'City',
                       prefixIcon: Icon(Icons.location_city_outlined),
                       border: OutlineInputBorder(
@@ -413,6 +419,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       fillColor: Colors.white,
                     ),
                     onChanged: (val) => _companyCity = val.trim(),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Enter city';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -421,7 +433,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: _buildInputCard(
                   child: TextFormField(
                     decoration: const InputDecoration(
-                      labelText: 'State',
+                      labelText: 'State *',
                       hintText: 'State',
                       prefixIcon: Icon(Icons.map_outlined),
                       border: OutlineInputBorder(
@@ -432,6 +444,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       fillColor: Colors.white,
                     ),
                     onChanged: (val) => _companyState = val.trim(),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Enter state';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -440,7 +458,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: _buildInputCard(
                   child: TextFormField(
                     decoration: const InputDecoration(
-                      labelText: 'Pincode',
+                      labelText: 'Pincode *',
                       hintText: 'Pincode',
                       prefixIcon: Icon(Icons.pin_drop_outlined),
                       border: OutlineInputBorder(
@@ -452,6 +470,15 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (val) => _companyPincode = val.trim(),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Enter pincode';
+                      }
+                      if (!RegExp(r'^\d{6}$').hasMatch(val)) {
+                        return 'Enter 6-digit pincode';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -459,15 +486,15 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
 
-          // GST and PAN Row
+          // GST and PAN Row (Required)
           Row(
             children: [
               Expanded(
                 child: _buildInputCard(
                   child: TextFormField(
                     decoration: const InputDecoration(
-                      labelText: 'GST Number',
-                      hintText: 'GST Number (optional)',
+                      labelText: 'GST Number *',
+                      hintText: 'GST Number',
                       prefixIcon: Icon(Icons.receipt_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -477,6 +504,16 @@ class _SignupScreenState extends State<SignupScreen> {
                       fillColor: Colors.white,
                     ),
                     onChanged: (val) => _gstNumber = val.trim(),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Enter GST number';
+                      }
+                      // Basic GSTIN pattern: 15 chars alphanumeric
+                      if (!RegExp(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$').hasMatch(val)) {
+                        return 'Enter valid GSTIN';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -485,8 +522,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: _buildInputCard(
                   child: TextFormField(
                     decoration: const InputDecoration(
-                      labelText: 'PAN Number',
-                      hintText: 'PAN Number (optional)',
+                      labelText: 'PAN Number *',
+                      hintText: 'PAN Number',
                       prefixIcon: Icon(Icons.credit_card_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -496,6 +533,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       fillColor: Colors.white,
                     ),
                     onChanged: (val) => _panNumber = val.trim(),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Enter PAN number';
+                      }
+                      if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(val)) {
+                        return 'Enter valid PAN';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -503,12 +549,12 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Company Phone (Optional)
+          // Company Phone (Required)
           _buildInputCard(
             child: TextFormField(
               decoration: const InputDecoration(
-                labelText: 'Company Phone',
-                hintText: 'Enter company phone number (optional)',
+                labelText: 'Company Phone *',
+                hintText: 'Enter company phone number',
                 prefixIcon: Icon(Icons.phone_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -519,16 +565,25 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               keyboardType: TextInputType.phone,
               onChanged: (val) => _companyPhone = val.trim(),
+              validator: (val) {
+                if (val == null || val.isEmpty) {
+                  return 'Enter company phone number';
+                }
+                if (!RegExp(r'^\d{10}$').hasMatch(val)) {
+                  return 'Enter 10-digit phone';
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 16),
 
-          // Company Email (Optional)
+          // Company Email (Required)
           _buildInputCard(
             child: TextFormField(
               decoration: const InputDecoration(
-                labelText: 'Company Email',
-                hintText: 'Enter company email (optional)',
+                labelText: 'Company Email *',
+                hintText: 'Enter company email',
                 prefixIcon: Icon(Icons.email_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -539,6 +594,15 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               keyboardType: TextInputType.emailAddress,
               onChanged: (val) => _companyEmail = val.trim(),
+              validator: (val) {
+                if (val == null || val.isEmpty) {
+                  return 'Enter company email';
+                }
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
+                  return 'Enter valid email';
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -899,6 +963,38 @@ class _SignupScreenState extends State<SignupScreen> {
         setState(() => _error = 'Please enter your full name');
         return;
       }
+      if (_companyAddress.isEmpty) {
+        setState(() => _error = 'Please enter company address');
+        return;
+      }
+      if (_companyCity.isEmpty) {
+        setState(() => _error = 'Please enter city');
+        return;
+      }
+      if (_companyState.isEmpty) {
+        setState(() => _error = 'Please enter state');
+        return;
+      }
+      if (_companyPincode.isEmpty || !RegExp(r'^\d{6}$').hasMatch(_companyPincode)) {
+        setState(() => _error = 'Please enter a valid 6-digit pincode');
+        return;
+      }
+      if (_gstNumber.isEmpty || !RegExp(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$').hasMatch(_gstNumber)) {
+        setState(() => _error = 'Please enter a valid GSTIN');
+        return;
+      }
+      if (_panNumber.isEmpty || !RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(_panNumber)) {
+        setState(() => _error = 'Please enter a valid PAN');
+        return;
+      }
+      if (_companyPhone.isEmpty || !RegExp(r'^\d{10}$').hasMatch(_companyPhone)) {
+        setState(() => _error = 'Please enter a valid 10-digit company phone');
+        return;
+      }
+      if (_companyEmail.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_companyEmail)) {
+        setState(() => _error = 'Please enter a valid company email');
+        return;
+      }
 
       setState(() {
         _currentStep = 2;
@@ -943,6 +1039,38 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     if (_adminName.isEmpty) {
       setState(() => _error = 'Please enter your full name');
+      return;
+    }
+    if (_companyAddress.isEmpty) {
+      setState(() => _error = 'Please enter company address');
+      return;
+    }
+    if (_companyCity.isEmpty) {
+      setState(() => _error = 'Please enter city');
+      return;
+    }
+    if (_companyState.isEmpty) {
+      setState(() => _error = 'Please enter state');
+      return;
+    }
+    if (_companyPincode.isEmpty || !RegExp(r'^\d{6}$').hasMatch(_companyPincode)) {
+      setState(() => _error = 'Please enter a valid 6-digit pincode');
+      return;
+    }
+    if (_gstNumber.isEmpty || !RegExp(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$').hasMatch(_gstNumber)) {
+      setState(() => _error = 'Please enter a valid GSTIN');
+      return;
+    }
+    if (_panNumber.isEmpty || !RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(_panNumber)) {
+      setState(() => _error = 'Please enter a valid PAN');
+      return;
+    }
+    if (_companyPhone.isEmpty || !RegExp(r'^\d{10}$').hasMatch(_companyPhone)) {
+      setState(() => _error = 'Please enter a valid 10-digit company phone');
+      return;
+    }
+    if (_companyEmail.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_companyEmail)) {
+      setState(() => _error = 'Please enter a valid company email');
       return;
     }
 

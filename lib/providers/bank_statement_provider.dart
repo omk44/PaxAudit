@@ -117,6 +117,20 @@ class BankStatementProvider extends ChangeNotifier {
       final createdBankStatement = bankStatement.copyWith(id: docRef.id);
       _bankStatements.insert(0, createdBankStatement);
 
+      // Notify all CAs that admin added a bank statement link
+      final notificationProvider = NotificationProvider();
+      final caEmails = await _getCAEmailsForCompany(companyId);
+      for (final caEmail in caEmails) {
+        await notificationProvider.notifyBankStatementChange(
+          action: 'created',
+          companyId: companyId,
+          caEmail: caEmail,
+          performedBy: uploadedBy,
+          bankStatementTitle: title,
+          bankStatementId: docRef.id,
+        );
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;

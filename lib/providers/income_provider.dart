@@ -108,6 +108,29 @@ class IncomeProvider extends ChangeNotifier {
         ); // Insert at beginning for recent first
       }
 
+      // Send notifications
+      final created = _incomes.firstWhere((i) => i.id == docRef.id);
+      // Notify all CAs
+      await NotificationProvider.sendNotificationToCAs(
+        action: 'created',
+        companyId: created.companyId,
+        performedBy: created.addedBy,
+        itemDescription: created.description,
+        amount: created.amount,
+        itemType: 'income',
+        itemId: created.id,
+      );
+      // Always notify admin as well (so CA actions reach admin)
+      await NotificationProvider.sendNotificationToAdmin(
+        action: 'created',
+        companyId: created.companyId,
+        performedBy: created.addedBy,
+        itemDescription: created.description,
+        amount: created.amount,
+        itemType: 'income',
+        itemId: created.id,
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;

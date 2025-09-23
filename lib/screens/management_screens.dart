@@ -137,43 +137,6 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('CA Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync, color: Colors.orange),
-            onPressed: () async {
-              // Check Firebase connectivity first
-              final isConnected = await caProvider.checkFirebaseConnectivity();
-              if (!isConnected) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Firebase connectivity issue: ${caProvider.error}',
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-                return;
-              }
-
-              // Fix all data consistency
-              final success = await caProvider.fixAllDataConsistency();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'All data consistency fixed successfully!'
-                          : 'Some fixes failed: ${caProvider.error}',
-                    ),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
-              }
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -191,45 +154,6 @@ class _CAManagementScreenState extends State<CAManagementScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.sync, color: Colors.blue),
-                          onPressed: () async {
-                            // Check Firebase connectivity first
-                            final isConnected = await caProvider
-                                .checkFirebaseConnectivity();
-                            if (!isConnected) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Firebase connectivity issue: ${caProvider.error}',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-
-                            // Fix specific CA consistency
-                            final success = await caProvider
-                                .fixCASpecificConsistency(ca.id);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    success
-                                        ? 'CA consistency fixed successfully!'
-                                        : 'Failed to fix CA consistency: ${caProvider.error}',
-                                  ),
-                                  backgroundColor: success
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                              );
-                            }
-                          },
-                        ),
                         IconButton(
                           icon: const Icon(Icons.edit),
                           onPressed: () {

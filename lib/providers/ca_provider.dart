@@ -126,23 +126,11 @@ class CAProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // First create the CA document
-      final now = DateTime.now();
-      final ca = CA(
-        id: '', // Will be set by Firestore
-        email: email,
-        name: name,
-        phoneNumber: phoneNumber,
-        licenseNumber: licenseNumber,
-        companyIds: companyIds ?? [],
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final docRef = await _firestore.collection('cas').add(ca.toFirestore());
-
-      // Create Firebase Auth user for the CA using secondary app to avoid affecting admin session
+      // Create Firebase Auth user for the CA using secondary app first to ensure login works
       FirebaseApp? secondaryApp;
+      String? createdUserUid;
+      String? createdCaDocId;
+      final now = DateTime.now();
       try {
         secondaryApp = await Firebase.initializeApp(
           name: 'ca-provisioning-${DateTime.now().millisecondsSinceEpoch}',
@@ -154,23 +142,49 @@ class CAProvider extends ChangeNotifier {
 
         final userCredential = await secondaryAuth
             .createUserWithEmailAndPassword(email: email, password: password);
+        createdUserUid = userCredential.user?.uid;
 
-        // Create user document with role 'ca' and link to CA
+        // After auth user exists, create the CA document (primary app)
+        final ca = CA(
+          id: '',
+          email: email,
+          name: name,
+          phoneNumber: phoneNumber,
+          licenseNumber: licenseNumber,
+          companyIds: companyIds ?? [],
+          createdAt: now,
+          updatedAt: now,
+        );
+        final caDocRef = await _firestore.collection('cas').add(ca.toFirestore());
+        createdCaDocId = caDocRef.id;
+
+        // Create user document with role 'ca' and link to CA (secondary app's store)
         await secondaryStore
             .collection('users')
             .doc(userCredential.user!.uid)
             .set({
               'email': email,
               'role': 'ca',
-              'caId': docRef.id,
+              'caId': createdCaDocId,
               'createdAt': FieldValue.serverTimestamp(),
             });
 
         // Clean up secondary app
         await secondaryAuth.signOut();
       } catch (e) {
-        print('Error creating CA user: $e');
-        // Continue without creating user if it fails
+        // Best-effort rollback if we created CA doc but user doc failed later
+        print('Error creating CA user/records: $e');
+        try {
+          if (createdCaDocId != null) {
+            await _firestore.collection('cas').doc(createdCaDocId).delete();
+          }
+        } catch (rollbackError) {
+          print('Error rolling back CA doc: $rollbackError');
+        }
+        _isLoading = false;
+        _error = 'Failed to create CA account. Please try again.';
+        notifyListeners();
+        return false;
       } finally {
         // Always clean up secondary app
         if (secondaryApp != null) {
@@ -183,18 +197,19 @@ class CAProvider extends ChangeNotifier {
       }
 
       // Add to local list with the generated ID
-      final createdCA = CA(
-        id: docRef.id,
-        email: email,
-        name: name,
-        phoneNumber: phoneNumber,
-        licenseNumber: licenseNumber,
-        companyIds: companyIds ?? [],
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      _cas.add(createdCA);
+      if (createdCaDocId != null) {
+        final createdCA = CA(
+          id: createdCaDocId,
+          email: email,
+          name: name,
+          phoneNumber: phoneNumber,
+          licenseNumber: licenseNumber,
+          companyIds: companyIds ?? [],
+          createdAt: now,
+          updatedAt: now,
+        );
+        _cas.add(createdCA);
+      }
 
       _isLoading = false;
       notifyListeners();

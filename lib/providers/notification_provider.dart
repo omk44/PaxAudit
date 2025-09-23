@@ -378,11 +378,11 @@ class NotificationProvider with ChangeNotifier {
     }
   }
 
-  // Helper method to send notifications to admin when CA makes changes
-  Future<bool> notifyAdminOfCAChange({
+  // Helper method to send notifications to admin when items change (by CA or admin)
+  Future<bool> notifyAdminOfItemChange({
     required String action, // 'created', 'updated', 'deleted'
     required String companyId,
-    required String performedBy, // CA email
+    required String performedBy, // actor identifier: CA email or 'admin'
     required String itemDescription,
     required double amount,
     required String itemType, // 'expense' or 'income'
@@ -404,31 +404,40 @@ class NotificationProvider with ChangeNotifier {
       String title;
       String message;
 
+      final lowerActor = performedBy.toLowerCase();
+      final isAdminActor = lowerActor == 'admin' || lowerActor.contains('admin');
+      final isCAActor = !isAdminActor; // default to CA if not clearly admin
+      final actorLabel = isCAActor ? 'CA' : 'Admin';
+      final actorDisplay = isAdminActor
+          ? 'Admin'
+          : (performedBy.contains('@') ? 'CA $performedBy' : 'CA');
+
       switch (action) {
         case 'created':
-          title = 'CA Added New $itemType';
+          title = '$actorLabel Added New $itemType';
           message =
-              'CA $performedBy added a new $itemType of ₹${amount.toStringAsFixed(2)} for "$itemDescription".';
+              '$actorDisplay added a new $itemType of ₹${amount.toStringAsFixed(2)} for "$itemDescription".';
           break;
         case 'updated':
-          title = 'CA Updated $itemType';
+          title = '$actorLabel Updated $itemType';
           message =
-              'CA $performedBy updated $itemType "$itemDescription" (₹${amount.toStringAsFixed(2)}).';
+              '$actorDisplay updated $itemType "$itemDescription" (₹${amount.toStringAsFixed(2)}).';
           break;
         case 'deleted':
-          title = 'CA Deleted $itemType';
+          title = '$actorLabel Deleted $itemType';
           message =
-              'CA $performedBy deleted $itemType "$itemDescription" (₹${amount.toStringAsFixed(2)}).';
+              '$actorDisplay deleted $itemType "$itemDescription" (₹${amount.toStringAsFixed(2)}).';
           break;
         default:
-          title = 'CA Modified $itemType';
-          message = 'CA $performedBy modified $itemType "$itemDescription".';
+          title = '$actorLabel Modified $itemType';
+          message = '$actorDisplay modified $itemType "$itemDescription".';
       }
 
       return await createNotification(
         title: title,
         message: message,
-        type: 'ca_${itemType}',
+        // For admin inbox we can use the base type to render standard icons/colors
+        type: itemType,
         action: action,
         companyId: companyId,
         caEmail: targetAdminEmail, // Send to admin
@@ -445,6 +454,29 @@ class NotificationProvider with ChangeNotifier {
       print('Error sending admin notification: $e');
       return false;
     }
+  }
+
+  // Backward-compatible wrapper
+  Future<bool> notifyAdminOfCAChange({
+    required String action,
+    required String companyId,
+    required String performedBy,
+    required String itemDescription,
+    required double amount,
+    required String itemType,
+    String? itemId,
+    String? adminEmail,
+  }) async {
+    return notifyAdminOfItemChange(
+      action: action,
+      companyId: companyId,
+      performedBy: performedBy,
+      itemDescription: itemDescription,
+      amount: amount,
+      itemType: itemType,
+      itemId: itemId,
+      adminEmail: adminEmail,
+    );
   }
 
   // Test method to create a sample notification
@@ -473,7 +505,7 @@ class NotificationProvider with ChangeNotifier {
   }) async {
     try {
       final notificationProvider = NotificationProvider();
-      await notificationProvider.notifyAdminOfCAChange(
+      await notificationProvider.notifyAdminOfItemChange(
         action: action,
         companyId: companyId,
         performedBy: performedBy,

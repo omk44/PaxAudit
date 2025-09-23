@@ -62,7 +62,7 @@ class CA {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       licenseNumber: licenseNumber ?? this.licenseNumber,
       companyIds: companyIds ?? this.companyIds,
-      createdAt: createdAt,
+      createdAt: this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

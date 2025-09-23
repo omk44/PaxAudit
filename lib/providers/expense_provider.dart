@@ -118,6 +118,29 @@ class ExpenseProvider extends ChangeNotifier {
         ); // Insert at beginning for recent first
       }
 
+      // Send notifications
+      final created = _expenses.firstWhere((e) => e.id == docRef.id);
+      // Notify all CAs (admin -> CAs, or CA -> other CAs also OK)
+      await NotificationProvider.sendNotificationToCAs(
+        action: 'created',
+        companyId: created.companyId,
+        performedBy: created.addedBy,
+        itemDescription: created.description,
+        amount: created.amount,
+        itemType: 'expense',
+        itemId: created.id,
+      );
+      // Always notify admin as well (so CA actions reach admin)
+      await NotificationProvider.sendNotificationToAdmin(
+        action: 'created',
+        companyId: created.companyId,
+        performedBy: created.addedBy,
+        itemDescription: created.description,
+        amount: created.amount,
+        itemType: 'expense',
+        itemId: created.id,
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;
