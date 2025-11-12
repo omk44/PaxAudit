@@ -54,12 +54,14 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
     });
     return AlertDialog(
       title: const Text('Add Expense'),
-      content: Form(
-        key: _formKey,
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               DropdownButtonFormField<String>(
                 value: _selectedCategoryId.isEmpty ? null : _selectedCategoryId,
                 items: categoryProvider.categories
@@ -167,9 +169,14 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
               ),
               if (_needsTransactionId(_paymentMethod))
                 TextFormField(
+                  key: const Key('transaction_id_field_add'),
+                  initialValue: '',
                   decoration: const InputDecoration(
                     labelText: 'Transaction/UPI ID (12+ chars)',
+                    hintText: 'Enter 12-digit transaction ID',
+                    prefixIcon: Icon(Icons.confirmation_number),
                   ),
+                  keyboardType: TextInputType.text,
                   onChanged: (val) => _transactionId = val.trim(),
                   validator: (val) {
                     if (!_needsTransactionId(_paymentMethod)) return null;
@@ -205,6 +212,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
           ),
         ),
       ),
+    ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -291,12 +299,14 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
     final categoryProvider = Provider.of<CategoryProvider>(context);
     return AlertDialog(
       title: const Text('Edit Expense'),
-      content: Form(
-        key: _formKey,
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               DropdownButtonFormField<String>(
                 value:
                     categoryProvider.categories.any((c) => c.id == _categoryId)
@@ -404,7 +414,10 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
                   initialValue: _transactionId,
                   decoration: const InputDecoration(
                     labelText: 'Transaction/UPI ID (12+ chars)',
+                    hintText: 'Enter 12-digit transaction ID',
+                    prefixIcon: Icon(Icons.confirmation_number),
                   ),
+                  keyboardType: TextInputType.text,
                   onChanged: (val) => _transactionId = val.trim(),
                   validator: (val) {
                     if (!_needsTransactionId(_paymentMethod)) return null;
@@ -438,6 +451,7 @@ class _ExpenseEditDialogState extends State<ExpenseEditDialog> {
           ),
         ),
       ),
+    ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),

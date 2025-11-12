@@ -38,11 +38,14 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Add Income'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             TextFormField(
               decoration: const InputDecoration(labelText: 'Amount'),
               keyboardType: const TextInputType.numberWithOptions(
@@ -84,9 +87,14 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
             if (_needsTransactionId(_paymentMethod)) ...[
               const SizedBox(height: 16),
               TextFormField(
+                key: const Key('transaction_id_field'),
+                initialValue: '',
                 decoration: const InputDecoration(
                   labelText: 'Transaction/UPI ID (12+ chars)',
+                  hintText: 'Enter 12-digit transaction ID',
+                  prefixIcon: Icon(Icons.confirmation_number),
                 ),
+                keyboardType: TextInputType.text,
                 onChanged: (v) => _transactionId = v.trim(),
                 validator: (val) {
                   if (!_needsTransactionId(_paymentMethod)) return null;
@@ -126,6 +134,8 @@ class _IncomeAddDialogState extends State<IncomeAddDialog> {
             ),
           ],
         ),
+      ),
+    ),
       ),
       actions: [
         TextButton(
@@ -201,11 +211,14 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Edit Income'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             TextFormField(
               initialValue: _amount.toString(),
               decoration: const InputDecoration(labelText: 'Amount'),
@@ -252,7 +265,10 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
                 initialValue: _transactionId,
                 decoration: const InputDecoration(
                   labelText: 'Transaction/UPI ID (12+ chars)',
+                  hintText: 'Enter 12-digit transaction ID',
+                  prefixIcon: Icon(Icons.confirmation_number),
                 ),
+                keyboardType: TextInputType.text,
                 onChanged: (v) => _transactionId = v.trim(),
                 validator: (val) {
                   if (!_needsTransactionId(_paymentMethod)) return null;
@@ -271,6 +287,8 @@ class _IncomeEditDialogState extends State<IncomeEditDialog> {
             ],
           ],
         ),
+      ),
+    ),
       ),
       actions: [
         TextButton(
